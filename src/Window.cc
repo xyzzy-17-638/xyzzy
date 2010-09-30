@@ -1767,7 +1767,7 @@ Fdelete_window ()
 }
 
 lisp
-Fdeleted_window_p (lisp window)
+Fselected_window ()
 {
   check_window (window);
   return boole (!xwindow_wp (window));
