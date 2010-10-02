@@ -7,8 +7,8 @@
 int
 check_kanji2 (const char *string, u_int off)
 {
-  const u_char *s0 = (u_char *)string, *se = s0 + off, *s = se;
-  for (;
+  const u_char *s0, *se, *s;
+  for (s0 = (u_char *)string, se = s0 + off, s = se;
        s-- > s0 && SJISP (*s);)
     ;
   return !((se - s) & 1);

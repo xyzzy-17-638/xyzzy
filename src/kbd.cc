@@ -1481,7 +1481,7 @@ Fselect_kbd_layout (lisp layout)
       w2s (name, name + sizeof name,
            xstring_contents (layout), xstring_length (layout));
 
-	  int i;
+      int i;
       for (i = 0; i < n; i++)
         {
           char buf[256];

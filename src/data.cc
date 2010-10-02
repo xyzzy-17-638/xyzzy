@@ -735,7 +735,7 @@ static lisp
 gc_mark_list (lisp list)
 {
   lisp ol, nl, cdr;
-  for (ol = list, nl = Qnil, cdr; consp (ol); ol = cdr)
+  for (ol = list, nl = Qnil; consp (ol); ol = cdr)
     {
       cdr = xcdr (ol);
       lisp x = xcar (ol);

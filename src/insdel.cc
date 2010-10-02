@@ -489,7 +489,7 @@ Buffer::insert_chars_internal (Point &point, const insertChars *ichars,
 
   Chunk *cp = point.p_chunk;
   int off = point.p_offset;
-  for (i = 0; i < repeat; i++)
+  for (int i = 0; i < repeat; i++)
     for (int j = 0; j < nargs; j++)
       {
         int rest = ichars[j].length;
@@ -1232,8 +1232,8 @@ static int
 count_cf_text_length (const u_char *string)
 {
   int l = 0;
-  const u_char *s = string;
-  for (; *s;)
+  const u_char *s;
+  for (s = string; *s;)
     {
       if (SJISP (*s))
         {
@@ -1333,8 +1333,8 @@ static int
 count_cf_wtext_length (const ucs2_t *string)
 {
   int l = 0;
-  const ucs2_t *s = string;
-  for (; *s; s++)
+  const ucs2_t *s;
+  for (s = string; *s; s++)
     if (*s == '\r')
       {
         if (s[1] == '\n')
@@ -1585,7 +1585,7 @@ copy_textprop (const textprop *p, textprop *t)
 textprop *
 Buffer::add_textprop (point_t p1, point_t p2)
 {
-  textprop *p , *prev;
+  textprop *p, *prev;
   for (p = textprop_head (p1), prev = 0; p; prev = p, p = p->t_next)
     if (*p > p1)
       break;

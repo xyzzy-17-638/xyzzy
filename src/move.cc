@@ -139,8 +139,8 @@ Buffer::point_linenum (point_t goal) const
 {
   long linenum = 1;
   point_t point = 0;
-  const Chunk *cp = b_chunkb;
-  for (; point + cp->c_used < goal; cp = cp->c_next)
+  const Chunk *cp;
+  for (cp = b_chunkb; point + cp->c_used < goal; cp = cp->c_next)
     {
       if (cp->c_nlines == -1)
         ((Chunk *)cp)->c_nlines = cp->count_lines ();
@@ -1335,8 +1335,8 @@ Buffer::update_fold_chunk (point_t goal, int fold_columns, update_fold_info &inf
 {
   info.linenum = 1;
   info.point = 0;
-  Chunk *cp = b_chunkb;
-  for (; info.point + cp->c_used < goal; cp = cp->c_next)
+  Chunk *cp;
+  for (cp = b_chunkb; info.point + cp->c_used < goal; cp = cp->c_next)
     {
       parse_fold_chunk (cp, fold_columns);
       info.linenum += cp->get_nbreaks(fold_columns);

@@ -356,12 +356,12 @@ glyph_rep::copy (const glyph_rep *src)
   if (src)
     {
       int h = min (gr_size.cy, src->gr_size.cy);
-	  int y = 0;
+      int y;
       for (y = 0; y < h; y++)
         {
           int w = min (gr_size.cx, LONG (src->gr_oglyph[y]->gd_len));
           memcpy (gr_oglyph[y]->gd_cc, src->gr_oglyph[y]->gd_cc, sizeof (glyph_t) * w);
-		  glyph_t *g, *ge;
+          glyph_t *g, *ge;
           for (g = gr_oglyph[y]->gd_cc + w,
                ge = gr_oglyph[y]->gd_cc + gr_size.cx;
                g < ge; g++)
@@ -372,7 +372,7 @@ glyph_rep::copy (const glyph_rep *src)
 
       for (; y < gr_size.cy; y++)
         {
-		  glyph_t *g, *ge;
+          glyph_t *g, *ge;
           for (g = gr_oglyph[y]->gd_cc, ge = g + gr_size.cx; g < ge; g++)
             *g = GLYPH_JUNK;
           *g = 0;
@@ -392,7 +392,7 @@ glyph_rep::copy (const glyph_rep *src)
     {
       for (int y = 0; y < gr_size.cy; y++)
         {
-		  glyph_t *g, *ge;
+          glyph_t *g, *ge;
           for (g = gr_oglyph[y]->gd_cc, ge = g + gr_size.cx; g < ge; g++)
             *g = GLYPH_JUNK;
           *g = 0;
@@ -584,7 +584,7 @@ Window::change_color ()
   else
     cc = default_colors;
 
-  int i = 0;
+  int i;
   for (i = 0; i < USER_DEFINABLE_COLORS; i++)
     if (cc[i] != w_colors[i])
       break;
@@ -772,14 +772,14 @@ Window::create_default_windows (ApplicationFrame *owner)
   mlcc[1] = XCOLORREF (sysdep.btn_text, COLOR_BTNTEXT);
 
   XCOLORREF fg[GLYPH_TEXTPROP_NCOLORS], bg[GLYPH_TEXTPROP_NCOLORS];
-  for (i = 0; i < GLYPH_TEXTPROP_NCOLORS; i++)
+  for (int i = 0; i < GLYPH_TEXTPROP_NCOLORS; i++)
     {
       fg[i] = w_textprop_forecolor[i];
       bg[i] = w_textprop_backcolor[i];
     }
 
   int c;
-  for (i = 0; i < USER_DEFINABLE_COLORS; i++)
+  for (int i = 0; i < USER_DEFINABLE_COLORS; i++)
     {
       if (read_conf (cfgColors, wcolor_index_names[i].name, c))
         cc[i] = c;
@@ -790,7 +790,7 @@ Window::create_default_windows (ApplicationFrame *owner)
     mlcc[0] = c;
   if (read_conf (cfgColors, cfgModeLineBg, c))
     mlcc[1] = c;
-  for (i = 1; i < GLYPH_TEXTPROP_NCOLORS; i++)
+  for (int i = 1; i < GLYPH_TEXTPROP_NCOLORS; i++)
     {
       char b[32];
       sprintf (b, "%s%d", cfgFg, i);
@@ -2892,10 +2892,10 @@ wc_calc_order (winconf *conf, int nwindows,
 
   int *pixels = (int *)alloca (sizeof *pixels * (norders + 1));
 
-  for (i = 0; i <= norders; i++)
+  for (int i = 0; i <= norders; i++)
     pixels[i] = -1;
 
-  for (i = 0; i < nwindows; i++)
+  for (int i = 0; i < nwindows; i++)
     {
       if (pixels[conf[i].order.*edge1] == -1)
         pixels[conf[i].order.*edge1] = conf[i].rect.*edge1;
@@ -2910,7 +2910,7 @@ wc_calc_order (winconf *conf, int nwindows,
   if (pixels[0] || pixels[norders] > sz)
     FEprogram_error (Einvalid_window_configuration);
 
-  for (i = 1; i <= norders; i++)
+  for (int i = 1; i <= norders; i++)
     if (pixels[i] == -1 || pixels[i] < pixels[i - 1])
       FEprogram_error (Einvalid_window_configuration);
 
@@ -2931,7 +2931,7 @@ wc_check_order (winconf *conf, int nwindows, const SIZE &sz)
       for (int x = conf[i].order.left; x < conf[i].order.right; x++)
         if (f[y * nx + x]++)
           FEprogram_error (Einvalid_window_configuration);
-  for (i = 0; i < n; i++)
+  for (int i = 0; i < n; i++)
     if (!f[i])
       FEprogram_error (Einvalid_window_configuration);
 }
@@ -2979,7 +2979,7 @@ wc_restore (ApplicationFrame* owner, winconf *conf, int nwindows, const SIZE &si
   for (wp = owner->active_frame.reserved; wp; wp = wp->w_next)
     wp->w_disp_flags &= ~(Window::WDF_WINDOW | Window::WDF_MODELINE);
 
-  for (i = 0; i < nwindows; i++)
+  for (int i = 0; i < nwindows; i++)
     conf[i].wp->w_disp_flags |= (Window::WDF_WINDOW
                                  | Window::WDF_MODELINE
                                  | Window::WDF_GOAL_COLUMN);

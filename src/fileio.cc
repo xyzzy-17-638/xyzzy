@@ -746,8 +746,7 @@ Buffer::make_backup_file_name (char *backup, const char *xoriginal)
                   *p = 0;
                   if (!strcasecmp (fd.cFileName, name))
                     {
-                      int n = 0;
-					  int i;
+                      int i, n = 0;
                       for (i = 1; i <= max_verchars && digit_char_p (p[i]); i++)
                         n = n * 10 + p[i] - '0';
                       if (i > 1 && p[i] == '~' && !p[i + 1])
@@ -767,7 +766,7 @@ Buffer::make_backup_file_name (char *backup, const char *xoriginal)
           int oldver = symbol_value_as_integer (Vkept_old_versions, this);
           int newver = symbol_value_as_integer (Vkept_new_versions, this) - 1;
 
-		  int i, n;
+          int i, n;
           for (i = 0, n = 0; i < max_versions && n < oldver; i++)
             if (bitmap[i])
               {

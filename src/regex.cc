@@ -1914,7 +1914,7 @@ Regexp::closure_backtrack (re_point &point, const Char *p, const Char *pe,
       match_void = 0;
       tstack->clear ();
 
-      for (i = 0; i < fstack->b_used; i++)
+      for (int i = 0; i < fstack->b_used; i++)
         if (!fstack->b_stack[i].match_void)
           {
             point = fstack->b_stack[i].point;

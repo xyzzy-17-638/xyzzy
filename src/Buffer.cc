@@ -541,7 +541,7 @@ Buffer::link_list ()
   else
     {
       long ver = 1;
-	  Buffer *bp;
+      Buffer *bp;
       for (bp = b_blist;; bp = bp->b_next)
         {
           int f = bcmp (xstring_contents (lbuffer_name),
@@ -950,7 +950,7 @@ Buffer::dlist_force_add_tail ()
         b_dlist = this;
       else
         {
-		  Buffer *d;
+          Buffer *d;
           for (d = b_dlist; d->b_ldisp; d = d->b_ldisp)
             ;
           d->b_ldisp = this;
@@ -1517,7 +1517,7 @@ Buffer::change_colors (const XCOLORREF *cc)
     {
       if (b_colors_enable)
         {
-		  int i;
+          int i;
           for (i = 0; i < USER_DEFINABLE_COLORS; i++)
             if (b_colors[i] != cc[i])
               break;

@@ -1220,11 +1220,11 @@ internal_to_iso2022_stream::select_designation (int ccs) const
   for (i = 0; i < 4; i++)
     if (s_initial[i] == ccs)
       return i;
-  for (i = 0; i < 4; i++)
+  for (int i = 0; i < 4; i++)
     if (s_designatable[i] != u_int (-1)
         && s_designatable[i] & (1 << ccs))
       return i;
-  for (i = 0; i < 4; i++)
+  for (int i = 0; i < 4; i++)
     if (s_designatable[i] == u_int (-1))
       return i;
   if (s_flags & ENCODING_ISO_LOCKING_SHIFT)

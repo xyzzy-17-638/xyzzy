@@ -714,8 +714,8 @@ xdelete (test_proc &test, T *p, int start, int end, lisp from_end, int count, in
     return l;
   if (from_end == Qnil || count >= end - start)
     {
-	  int i = start, j = start;
-      for (; i < end; i++)
+      int i, j;
+      for (i = start, j = start; i < end; i++)
         if (!test.test (coerce_to_lisp_object (p[i])))
           p[j++] = p[i];
         else if (!--count)
@@ -731,8 +731,8 @@ xdelete (test_proc &test, T *p, int start, int end, lisp from_end, int count, in
     }
   else
     {
-	  int i = end - 1, j = end;
-      for (; i >= start; i--)
+      int i, j;
+      for (i = end - 1, j = end; i >= start; i--)
         if (!test.test (coerce_to_lisp_object (p[i])))
           p[--j] = p[i];
         else if (!--count)

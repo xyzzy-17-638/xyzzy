@@ -604,7 +604,7 @@ Window::paint_glyphs (HDC hdc, HDC hdcmem, const glyph_t *gstart, const glyph_t 
             ;
           g0 += b - buf;
         }
-	  const glyph_t *g1;
+      const glyph_t *g1;
       for (g1 = g;
            g1 > g0 && (g1[-1] & ~GLYPH_COLOR_MASK) == ' ';
            g1--)
@@ -1733,10 +1733,10 @@ regexp_kwd::kwdmatch (const Point &point, int scolor, int &revkwd)
                                     }
                                   while (consp (val));
 
-                                  for (i = end - beg - 1; i >= 0; i--)
+                                  for (int i = end - beg - 1; i >= 0; i--)
                                     rk_vals[i] = 0;
 
-                                  for (i = 0; i <= re.re_regs.nregs; i++)
+                                  for (int i = 0; i <= re.re_regs.nregs; i++)
                                     if (vals[i] >= 0)
                                       {
                                         point_t b = re.re_regs.start[i];
@@ -2571,7 +2571,7 @@ Window::find_motion () const
       int f = compare_glyph (og[y], ng[y2], offset);
       if (!f)
         continue;
-	  int oy, ny;
+      int oy, ny;
       for (oy = y - 1, ny = y2 - 1; oy >= y1; oy--, ny--)
         {
           int f2 = compare_glyph (og[oy], ng[ny], offset);
@@ -2594,7 +2594,7 @@ Window::find_motion () const
           int f = compare_glyph (og[y2], ng[y], offset);
           if (!f)
             continue;
-		  int oy, ny;
+          int oy, ny;
           for (oy = y2 - 1, ny = y - 1; ny >= y1; oy--, ny--)
             {
               int f2 = compare_glyph (og[oy], ng[ny], offset);
@@ -2769,6 +2769,7 @@ Window::scroll_lines (int dy)
       glyph_data **ngx = ng;
       glyph_data **osave = (glyph_data **)alloca (sizeof (glyph_data *) * dy * 2);
       glyph_data **nsave = osave + dy;
+      int i;
       for (i = 0; i < dy; i++)
         {
           osave[i] = *og++;
@@ -2801,6 +2802,7 @@ Window::scroll_lines (int dy)
       glyph_data **ngx = ng;
       glyph_data **osave = (glyph_data **)alloca (sizeof (glyph_data *) * dy * 2);
       glyph_data **nsave = osave + dy;
+      int i;
       for (i = 0; i < dy; i++)
         {
           osave[i] = *--og;

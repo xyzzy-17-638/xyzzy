@@ -644,8 +644,8 @@ completion::split_pathname ()
 {
   const Char *p0 = xstring_contents (c_target);
   const Char *pe = p0 + xstring_length (c_target);
-  const Char *p = pe;
-  for (;
+  const Char *p;
+  for (p = pe;
        p > p0 && p[-1] != ':' && p[-1] != '/' && p[-1] != '\\';
        p--)
     ;
@@ -693,8 +693,8 @@ completion::complete_UNC (lisp &directory)
   int l = pe - p0;
   if (l < 2 || *p0 != '/' || p0[1] != '/')
     return 0;
-  const Char *p = p0 + 2;
-  for (; p < pe && *p != '/'; p++)
+  const Char *p;
+  for (p = p0 + 2; p < pe && *p != '/'; p++)
     ;
   for (; pe > p && pe[-1] == '/'; pe--)
     ;

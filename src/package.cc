@@ -334,8 +334,8 @@ find_prime (int n)
 {
   static const int prime[] =
     {11, 53, 101, 211, 307, 401, 503, 601, 701, 809, 907, 1009,};
-  int i = 0;
-  for (; i < numberof (prime); i++)
+  int i;
+  for (i = 0; i < numberof (prime); i++)
     if (prime[i] >= n)
       return prime[i];
   return prime[i - 1];

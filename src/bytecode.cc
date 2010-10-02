@@ -507,7 +507,7 @@ restart:
       if (nld->type == Qtagbody && nld->id == frame)
         {
           set_pc (frame_pc);
-          for (i = 0; i < ntags; i++)
+          for (int i = 0; i < ntags; i++)
             {
               int next_pc = fetch ();
               if (Feql (nld->tag, constant (fetch ())) != Qnil)

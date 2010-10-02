@@ -294,7 +294,7 @@ insert_menu (lisp lmenu, int pos, lisp item, UINT flags, const char *name, UINT 
             FEsimple_win32_error (GetLastError ());
         }
       l -= pos;
-	  lisp p;
+      lisp p;
       for (p = xwin32_menu_items (lmenu); --l > 0; p = xcdr (p))
         assert (consp (p));
       assert (consp (p));
@@ -863,7 +863,7 @@ Fcopy_menu_items (lisp old_menu, lisp new_menu)
 
   int v5 = sysdep.Win5p () || sysdep.Win98p ();
   int count = GetMenuItemCount (xwin32_menu_handle (old_menu));
-  for (i = 0; i < count; i++)
+  for (int i = 0; i < count; i++)
     {
       MENUITEMINFO5 m;
       char name[1024];

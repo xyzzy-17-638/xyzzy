@@ -154,7 +154,7 @@ utimer::gc_mark (void (*f)(lisp))
   timer_entry *p = t_entries.head ();
   for (; p; p = p->next ())
     (*f)(p->te_fn);
-  for (p = t_defers.head (); p; p = p->next ())
+  for (timer_entry *p = t_defers.head (); p; p = p->next ())
     (*f)(p->te_fn);
 }
 

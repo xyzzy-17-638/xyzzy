@@ -59,7 +59,7 @@ XMessageBox::calc_button_size (RECT br[MAX_BUTTONS]) const
   SelectObject (hdc, of);
   ReleaseDC (hwnd, hdc);
 
-  for (i = 0; i < nbuttons; i++)
+  for (int i = 0; i < nbuttons; i++)
     {
       br[i].top = 0;
       br[i].bottom = r.bottom;
@@ -212,7 +212,7 @@ XMessageBox::init_dialog ()
           r.right = w;
           d = XOFF;
         }
-      for (i = 0; i < nbuttons; i++)
+      for (int i = 0; i < nbuttons; i++)
         {
           br[i].left += d;
           br[i].right += d;

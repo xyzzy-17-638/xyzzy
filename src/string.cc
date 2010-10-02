@@ -378,7 +378,7 @@ make_string_from_list (lisp list)
     check_char (xcar (x));
   lisp string = make_string (l);
   Char *s = xstring_contents (string);
-  for (x = list; consp (x); x = xcdr (x))
+  for (lisp x = list; consp (x); x = xcdr (x))
     *s++ = xchar_code (xcar (x));
   return string;
 }
@@ -387,8 +387,8 @@ lisp
 make_string_from_vector (lisp vector)
 {
   assert (general_vector_p (vector));
-  lisp *p = xvector_contents (vector), *pe = p + xvector_length (vector);
-  for (; p < pe; p++)
+  lisp *p, *pe;
+  for (p = xvector_contents (vector), pe = p + xvector_length (vector); p < pe; p++)
     check_char (*p);
   lisp string = make_string (xvector_length (vector));
   Char *s = xstring_contents (string);
@@ -712,8 +712,8 @@ match_char_bag (Char c, lisp bag)
 static const Char *
 left_trim (const Char *p0, int l, lisp bag)
 {
-  const Char *p = p0, *pe = p + l;
-  for (; p < pe; p++)
+  const Char *p, *pe;
+  for (p = p0, pe = p + l; p < pe; p++)
     if (!match_char_bag (*p, bag))
       break;
   return p;
@@ -722,8 +722,8 @@ left_trim (const Char *p0, int l, lisp bag)
 static const Char *
 right_trim (const Char *p0, int l, lisp bag)
 {
-  const Char *p = p0 + l;
-  for (; p > p0; p--)
+  const Char *p;
+  for (p = p0 + l; p > p0; p--)
     if (!match_char_bag (p[-1], bag))
       break;
   return p;

@@ -1164,7 +1164,7 @@ number_A_reader (lisp stream, Char, dispmacro_param &param)
   count_dimensions (stream, object, dims, rank - 1);
 
   lisp d = Qnil;
-  for (i = 0; i < rank; i++)
+  for (int i = 0; i < rank; i++)
     d = xcons (make_fixnum (dims[i]), d);
 
   lisp array = Fsi_make_array (d, Qt, Qnil, Qnil, Qnil, Qnil);

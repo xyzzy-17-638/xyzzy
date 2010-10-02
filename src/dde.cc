@@ -259,7 +259,7 @@ topic_list_callback (DdeCallbackInfo *dci)
       DdeFreeDataHandle (hdata);
       return HDDEDATA (dci->type == XTYP_REQUEST ? DDE_FNOTPROCESSED : 0);
     }
-  for (t = DdeServerTopicList; t->topic; t++)
+  for (DdeTopicList *t = DdeServerTopicList; t->topic; t++)
     {
       data = stpcpy (data, t->topic);
       *data++ = '\t';
@@ -300,7 +300,7 @@ item_list_callback (DdeCallbackInfo *dci)
       DdeFreeDataHandle (hdata);
       return HDDEDATA (dci->type == XTYP_REQUEST ? DDE_FNOTPROCESSED : 0);
     }
-  for (il = t->items; il->item; il++)
+  for (DdeItemList *il = t->items; il->item; il++)
     if (il->item != DDE_EXECUTE_ITEM)
       {
         data = stpcpy (data, il->item);

@@ -872,7 +872,7 @@ preview_dialog::scale_command (int code)
                                     WPARAM (-1), LPARAM (buf));
         if (i != CB_ERR)
           return 1;
-		char *b;
+        char *b;
         for (b = buf; *b == ' '; b++)
           ;
         char *be;

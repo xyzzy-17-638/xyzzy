@@ -168,7 +168,7 @@ buffer_list_init_item (HWND list)
   ListView_SetItemCount (list, nbuffers);
 
   int i = 0, cur = 0;
-  for (bp = Buffer::b_blist; bp; bp = bp->b_next)
+  for (const Buffer *bp = Buffer::b_blist; bp; bp = bp->b_next)
     if (!bp->internal_buffer_p ())
       {
         if (bp == selected_buffer ())

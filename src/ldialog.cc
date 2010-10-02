@@ -45,7 +45,7 @@ Dialog::enable_windows (dlgctrl *c, int status)
         }
     }
 
-  for (grp = safe_find_keyword (Kdisable, kwd); consp (grp); grp = xcdr (grp))
+  for (lisp grp = safe_find_keyword (Kdisable, kwd); consp (grp); grp = xcdr (grp))
     {
       dlgctrl *x = get_item (xcar (grp));
       if (x)
@@ -828,7 +828,7 @@ Dialog::init_items ()
         EnableWindow (GetDlgItem (d_hwnd, c->id ()), 0);
     }
 
-  for (p = d_init; consp (p); p = xcdr (p))
+  for (lisp p = d_init; consp (p); p = xcdr (p))
     {
       lisp x = xcar (p);
       if (consp (x))
@@ -842,7 +842,7 @@ Dialog::init_items ()
         }
     }
 
-  for (p = d_item; consp (p); p = xcdr (p))
+  for (lisp p = d_item; consp (p); p = xcdr (p))
     {
       dlgctrl *c = (dlgctrl *)xcar (p);
       lisp wclass = c->wclass ();
@@ -1502,7 +1502,7 @@ Dialog::create_dialog_template (lisp dialog, lisp handlers,
               int style = fixnum_value (xcar (item));
               if (staticp && (style & SS_TYPEMASK) == SS_ICON)
                 size += sizeof (WORD) * 2;
-              for (i = 0; i < 4; i++)
+              for (int i = 0; i < 4; i++)
                 {
                   item = xcdr (item);
                   fixnum_value (xcar (item));
@@ -1536,7 +1536,8 @@ Dialog::create_dialog_template (lisp dialog, lisp handlers,
   d_tmpl->dwExtendedStyle = 0;
   d_tmpl->cdit = nitems;
   w = (WORD *)&d_tmpl->x;
-  for (i = 0, d = xcdr (d); i < 4; i++, d = xcdr (d))
+  d = xcdr (d);
+  for (int i = 0; i < 4; i++, d = xcdr (d))
     *w++ = WORD (fixnum_value (xcar (d)));
 
   *w++ = 0; // menu
@@ -1582,7 +1583,7 @@ Dialog::create_dialog_template (lisp dialog, lisp handlers,
           tmpl->style = fixnum_value (lstyle);
           tmpl->dwExtendedStyle = 0;
           w = (WORD *)&tmpl->x;
-          for (i = 0; i < 4; i++)
+          for (int i = 0; i < 4; i++)
             {
               *w++ = WORD (fixnum_value (xcar (item)));
               item = xcdr (item);
@@ -1942,7 +1943,7 @@ Fproperty_sheet (lisp pages, lisp caption, lisp lstart_page)
 
   PROPSHEETPAGE *psp = (PROPSHEETPAGE *)alloca (sizeof *psp * total_pages);
   int i = 0, j = 0;
-  for (p = pages; consp (p); p = xcdr (p), i++)
+  for (lisp p = pages; consp (p); p = xcdr (p), i++)
     {
       lisp x = xcar (p);
       if (x == Qfont_page)

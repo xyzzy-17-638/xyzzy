@@ -548,7 +548,7 @@ buffer_bar::buffer_list () const
   lisp r = Qnil;
   for (int i = 0, n = item_count (); i < n; i++)
     {
-      bp = nth (i);
+      Buffer *bp = nth (i);
       if (bp)
         {
           r = xcons (bp->lbp, r);

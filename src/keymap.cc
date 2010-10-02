@@ -197,7 +197,7 @@ scan_key_slot (lisp keymap, Char c, int igcase)
   if (igcase && alpha_char_p (c))
     {
       cc = make_char (_char_transpose_case (c));
-      for (p = keymap; consp (p); p = xcdr (p))
+      for (lisp p = keymap; consp (p); p = xcdr (p))
         {
           lisp x = xcar (p);
           if (consp (x) && xcar (x) == cc)
@@ -465,7 +465,7 @@ Fcommand_keys (lisp command, lisp gmap, lisp lmap, lisp minor_map)
       lisp r = command_keys (command, map[i], 0, map, i);
       if (consp (r))
         {
-			lisp x;
+          lisp x;
           for (x = r; consp (xcdr (x)); x = xcdr (x))
             ;
           xcdr (x) = result;

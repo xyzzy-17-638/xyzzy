@@ -350,9 +350,9 @@ declare_progn (lisp body, lex_env &lex, int can_doc)
   if (nspecials)
     {
       lisp var = Qnil;
-      for (e = lex.lex_var; e != lex.lex_ltail; e = xcdr (e))
+      for (lisp e = lex.lex_var; e != lex.lex_ltail; e = xcdr (e))
         var = xcons (xcar (e), var);
-      for (e = var; consp (e); e = xcdr (e))
+      for (lisp e = var; consp (e); e = xcdr (e))
         {
           lisp x = xcar (e);
           if (consp (x) && symbolp (xcar (x))
@@ -468,7 +468,7 @@ funcall_builtin (lisp f, lisp arglist)
       arglist = xcdr (arglist);
     }
 
-  for (i = xfunction_nopts (f); i > 0; i--)
+  for (int i = xfunction_nopts (f); i > 0; i--)
     {
       if (!consp (arglist))
         {
@@ -1788,11 +1788,11 @@ process_interactive_string (lisp fmt, lisp args)
           c = *p++;
         }
 
-	  const Char *p0 = p;
-      for (; p < pe && *p != '\n'; p++)
+      const Char *p0;
+      for (p0 = p; p < pe && *p != '\n'; p++)
         ;
 
-	  lisp al;
+      lisp al;
       for (al = xsymbol_value (intr_alist);
            consp (al); al = xcdr (al))
         {

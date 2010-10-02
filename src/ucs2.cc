@@ -288,8 +288,8 @@ init_wc2perlang_table (Char *const tab, int min, int max,
                        const Char *wincr, int nwincr,
                        const Char *rest, int nrest)
 {
-  int i = 0;
-  for (; i < 0x80; i++)
+  int i;
+  for (i = 0; i < 0x80; i++)
     tab[i] = i;
   for (; i < 0x10000; i++)
     tab[i] = Char (-1);
