@@ -1,3 +1,36 @@
+2010-12-12  NANRI Masaoki  <southly@gmail.com>
+
+	* lisp : support lzma and xz in filer.
+	lzma および xz の圧縮と展開をファイラから利用できるように修正。
+
+2010-12-12  NANRI Masaoki  <southly@gmail.com>
+
+	* src : support lzma and xz.
+	tar32.dll Ver2.35 から利用できるようになった lzma および xz の圧縮と展
+	開に対応。
+
+2010-12-11  NANRI Masaoki  <southly@gmail.com>
+
+	* src : fix hash-table.
+	rehash 時に不要なハッシュオブジェクトのエントリーを NULL に設定している
+	ので、サイズも 0 に設定する。hash-table のマークフェーズ(data.ccの613行
+	目あたり)で NULL を参照するのを防止する。
+	以下のような hash-table が rehash した後の GC のタイミングで落ちる現象
+	がおそらく解消すると思われる。
+	http://twitter.com/miyamuko/status/14229437114
+	http://d.hatena.ne.jp/knenet/20091223/1261578863
+
+2010-12-10  NANRI Masaoki  <southly@gmail.com>
+
+	* src : fix (cdr '#1='#1#) printing.
+	http://blog.bugyo.tk/lyrical/archives/610
+	http://blog.practical-scheme.net/gauche/20100609-curious-circular-list
+	「(cdr '#1='#1#)」の評価結果の印字でスタックオーバーフローするのを修正。
+	'#1='#1#              => #1='#1#
+	(cdr '#1='#1#)        => #1=((quote . #1#))
+	(cdr '#1=(quote #1#)) => #1=((quote . #1#))
+	(cdr '#1=(q #1#))     => #1=((q . #1#))
+
 2010-12-01  NANRI Masaoki  <southly@gmail.com>
 
 	* src : fix macroexpand.
