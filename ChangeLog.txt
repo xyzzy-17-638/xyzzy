@@ -1,3 +1,62 @@
+2011-01-21  NANRI Masaoki  <southly@gmail.com>
+
+	* lisp : fix pipe-command.
+	「plink name@example.jp ls」と plink を利用しようとすると
+	「Unable to read from standard input: ハンドルが無効です。」
+	というエラーになるのを修正。
+
+	execute-shell-command の第二引数に文字列・nil以外の引数を渡すとファイル
+	名が空のファイルを開こうとするので、エラーになっていた模様。
+
+2011-01-21  NANRI Masaoki  <southly@gmail.com>
+
+	* src : fix multiple binding of special variables in let, let*.
+	http://d.hatena.ne.jp/bowbow99/20101127/1290818576
+	let や let* で同一のスペシャル変数に対して複数回の束縛を作ったときの値
+	がおかしいのを修正。
+	コンパイルしたときの動作は修正できていない。
+	(progn
+	  (defparameter *special* :global)
+	  (let ((*special* :local-1)
+	        (*special* :local-2))
+	    *special*))
+	=> :local-2
+
+	レキシカルな環境には逆順に登録されるので、スペシャル変数に値を設定する
+	前に順序を元に戻している。
+
+2011-01-05  NANRI Masaoki  <southly@gmail.com>
+
+	* src : fix let, let*.
+	http://d.hatena.ne.jp/bowbow99/20101127/1290818576
+	コンパイルしたときは値が変わることはないが、インタプリタと同様に逆順で
+	値をリストアするように修正。
+
+2011-01-04  NANRI Masaoki  <southly@gmail.com>
+
+	* src : fix special variables restore at the end of let, let*.
+	http://d.hatena.ne.jp/bowbow99/20101127/1290818576
+	let や let* で同一のスペシャル変数に対して複数回の束縛を作ると、スコー
+	プが外れたときに値が書き換わってしまうのを修正。
+	(progn
+	  (defparameter *special* :global)
+	  (let ((*special* :local-1)
+	        (*special* :local-2))
+	    *special*)
+	  *special*)
+	=> :global
+
+	値を保存するとき(src/eval.cc 347行目辺り)と逆順に値をリストアするように
+	した。
+
+2010-12-14  NANRI Masaoki  <southly@gmail.com>
+
+	* src : fix eol-code of zero size file.
+	ファイルサイズが 0 のときの (正確には改行がないファイルのときの) 改行コー
+	ドが常に CRLF になるのを修正し *default-eol-code* に基づいた改行コード
+	になるようにする。
+	xyzzy Part16 577
+
 2010-12-13  NANRI Masaoki  <southly@gmail.com>
 
 	* src : fix DLL loading (hhctrl.ocx).
