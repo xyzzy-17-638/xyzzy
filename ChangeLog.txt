@@ -1,3 +1,73 @@
+2011-12-21  NANRI Masaoki  <southly@gmail.com>
+
+	* lisp : fix saving session file.
+	ヒストリファイルと同様にセッションファイルも書き込み時に *print-length*
+	などの影響を受けないよう修正。
+
+	(progn
+	  (ed::write-session-file "0ssn.l")
+	  (let ((*print-circle* t)
+	        (*print-pretty* nil)
+	        (*print-length* 1)
+	        (*print-level* 1))
+	    (ed::write-session-file "1ssn.l")))
+
+2011-12-21  NANRI Masaoki  <southly@gmail.com>
+
+	* lisp : fix saving history-file.
+	ヒストリファイル書き込み時に *print-length* などの影響を受けるのを修正。
+
+	(progn
+	  (let ((*history-file-name* "0hist.l"))
+	    (ed::save-history-file))
+	  (let ((*history-file-name* "1hist.l")
+	        (*print-circle* t)
+	        (*print-pretty* nil)
+	        (*print-length* 1)
+	        (*print-level* 1))
+	    (ed::save-history-file)))
+
+2011-12-20  NANRI Masaoki  <southly@gmail.com>
+
+	* src : fix equalp for hash-table.
+	equalp に hash-table を渡すと多値が返ってくる問題を修正。
+	https://gist.github.com/1480046
+
+2011-06-17  NANRI Masaoki  <southly@gmail.com>
+
+	* src : fix sxhash.
+	sxhash の値が equalp 用の値になっているが equal 用の値になるように修正。
+	(= (sxhash (list "ABC")) (sxhash (list "ABC"))) => t
+	(= (sxhash (list "abc")) (sxhash (list "ABC"))) => nil
+
+2011-06-15  NANRI Masaoki  <southly@gmail.com>
+
+	* lisp : fix compiling lambda form.
+	lambda form をコンパイルするとレキシカル変数を参照できなくなっていた問
+	題を修正。
+	https://gist.github.com/998414
+	https://gist.github.com/1000096
+
+2011-06-14  NANRI Masaoki  <southly@gmail.com>
+
+	* lisp : fix typo in lisp/compile.l.
+	関数名のミスを修正。
+	https://twitter.com/#!/bowbow99/status/80332901014704128
+
+2011-01-30  NANRI Masaoki  <southly@gmail.com>
+
+	* src : fix abbreviate-display-string.
+	abbreviate-display-string で必要以上に文字列が省略されることがあるのを
+	修正。以下のようになる場合があった。
+	(abbreviate-display-string "D:/src/cmigemo-1.3c-MIT/src/wordlist.h" 40 t)
+	=> "D:/..."
+
+	string.cc の 1109 行目、以下のようになっていた。
+	  strcpy (le, "...");
+	  strcpy (le + 3, rb);
+	はじめの strcpy で '\0' が書き込まれ、その位置がちょうど rb と一致した
+	ときに発生した。
+
 2011-01-21  NANRI Masaoki  <southly@gmail.com>
 
 	* lisp : fix pipe-command.
