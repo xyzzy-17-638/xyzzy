@@ -89,7 +89,7 @@ main (int argc, char **argv)
       printf ("static const char *const message_string[] =\n");
       printf ("{\n");
       int l = 0;
-      for (i = 0; i < numberof (msg); i++)
+      for (int i = 0; i < numberof (msg); i++)
         {
           printf ("  SSM + %d,\n", l);
           l += strlen (msg[i].text) + 1;

@@ -186,7 +186,7 @@ create_sexp (xyzzysrv &sv, int ac, char **av)
   *d++ = ' ';
   *d++ = '\'';
   *d++ = '(';
-  for (i = 0; i < ac; i++)
+  for (int i = 0; i < ac; i++)
     d = store (d, av[i]);
   *d++ = ')';
   *d++ = ')';
@@ -343,8 +343,8 @@ xmain (int argc, char **argv, const char *xyzzy, int multi_instance)
           return error (IDS_CALL_PROCESS);
 
 #define RETRY_MAX 30
-		int i = 0;
-        for (; i < RETRY_MAX; i++)
+        int i;
+        for (i = 0; i < RETRY_MAX; i++)
           {
             if (find_server (ls))
               break;
@@ -398,8 +398,8 @@ parse_cmdline1 (const char *p, char *&b0, int &ac, char **&av0, int nchars)
       int dq = 0;
       while (1)
         {
-		  int nbacksl = 0;
-          for (; *p == '\\'; nbacksl++, p++)
+          int nbacksl;
+          for (nbacksl = 0; *p == '\\'; nbacksl++, p++)
             ;
 
           int ignore = 0;

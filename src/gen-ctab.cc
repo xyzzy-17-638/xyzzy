@@ -27,19 +27,19 @@ ctype ()
   int i;
   for (i = '0'; i <= '9'; i++)
     buf[i] |= _CTN;
-  for (i = 'A'; i <= 'Z'; i++)
+  for (int i = 'A'; i <= 'Z'; i++)
     buf[i] |= _CTU;
-  for (i = 'a'; i <= 'z'; i++)
+  for (int i = 'a'; i <= 'z'; i++)
     buf[i] |= _CTL;
-  for (i = 0xa1; i <= 0xdf; i++)
+  for (int i = 0xa1; i <= 0xdf; i++)
     buf[i] |= _CTK;
-  for (i = 0x81; i <= 0x9f; i++)
+  for (int i = 0x81; i <= 0x9f; i++)
     buf[i] |= _CTK1;
-  for (i = 0xe0; i <= 0xfc; i++)
+  for (int i = 0xe0; i <= 0xfc; i++)
     buf[i] |= _CTK1;
-  for (i = 0x40; i <= 0x7e; i++)
+  for (int i = 0x40; i <= 0x7e; i++)
     buf[i] |= _CTK2;
-  for (i = 0x80; i <= 0xfc; i++)
+  for (int i = 0x80; i <= 0xfc; i++)
     buf[i] |= _CTK2;
 
   printf ("unsigned char char_type_table[] =\n");
@@ -56,7 +56,7 @@ translate ()
   int i;
   for (i = 0; i < 256; i++)
     buf[i] = i;
-  for (i = 'a'; i <= 'z'; i++)
+  for (int i = 'a'; i <= 'z'; i++)
     buf[i] = i - 'a' + 'A';
 
   printf ("unsigned char char_translate_upcase_table[] =\n");
@@ -64,9 +64,9 @@ translate ()
   dump (buf, sizeof buf);
   printf ("};\n\n");
 
-  for (i = 0; i < 256; i++)
+  for (int i = 0; i < 256; i++)
     buf[i] = i;
-  for (i = 'A'; i <= 'Z'; i++)
+  for (int i = 'A'; i <= 'Z'; i++)
     buf[i] = i - 'A' + 'a';
 
   printf ("unsigned char char_translate_downcase_table[] =\n");
@@ -74,7 +74,7 @@ translate ()
   dump (buf, sizeof buf);
   printf ("};\n\n");
 
-  for (i = 0; i < 256; i++)
+  for (int i = 0; i < 256; i++)
     buf[i] = i;
 
   printf ("unsigned char char_no_translate_table[] =\n");
@@ -90,11 +90,11 @@ numeric ()
   int i;
   for (i = 0; i < 128; i++)
     buf[i] = 36;
-  for (i = '0'; i <= '9'; i++)
+  for (int i = '0'; i <= '9'; i++)
     buf[i] = i - '0';
-  for (i = 'A'; i <= 'Z'; i++)
+  for (int i = 'A'; i <= 'Z'; i++)
     buf[i] = i - 'A' + 10;
-  for (i = 'a'; i <= 'z'; i++)
+  for (int i = 'a'; i <= 'z'; i++)
     buf[i] = i - 'a' + 10;
 
   printf ("char char_numeric_table[] =\n");
@@ -169,9 +169,9 @@ b64tab ()
   int i;
   for (i = 'A'; i <= 'Z'; i++)
     buf[i] = i - 'A';
-  for (i = 'a'; i <= 'z'; i++)
+  for (int i = 'a'; i <= 'z'; i++)
     buf[i] = i - 'a' + 26;
-  for (i = '0'; i <= '9'; i++)
+  for (int i = '0'; i <= '9'; i++)
     buf[i] = i - '0' + 52;
   buf['+'] = 62;
   buf['/'] = 63;
@@ -202,14 +202,14 @@ utf7tab ()
   const char *p;
   for (i = 'A'; i <= 'Z'; i++)
     buf[i] = UTF7_SET_D | UTF7_SET_B;
-  for (i = 'a'; i <= 'z'; i++)
+  for (int i = 'a'; i <= 'z'; i++)
     buf[i] = UTF7_SET_D | UTF7_SET_B;
-  for (i = '0'; i <= '9'; i++)
+  for (int i = '0'; i <= '9'; i++)
     buf[i] = UTF7_SET_D | UTF7_SET_B;
   for (p = "'(),-./:?"; *p; p++)
     buf[*p] = UTF7_SET_D;
 
-  for (p = "!\"#$%&*;<=>@[]^_`{|}"; *p; p++)
+  for (const char *p = "!\"#$%&*;<=>@[]^_`{|}"; *p; p++)
     buf[*p] = UTF7_SET_O;
 
   buf['+'] |= UTF7_SET_B;
@@ -220,9 +220,9 @@ utf7tab ()
   buf['\r'] = UTF7_WHITE;
   buf['\n'] = UTF7_WHITE;
 
-  for (i = 0x20; i <= 0x25; i++)
+  for (int i = 0x20; i <= 0x25; i++)
     buf[i] |= UTF7_IMAP4_MAILBOX_NAME;
-  for (i = 0x27; i <= 0x7e; i++)
+  for (int i = 0x27; i <= 0x7e; i++)
     buf[i] |= UTF7_IMAP4_MAILBOX_NAME;
 
   buf['+'] |= UTF7_SHIFT_CHAR;
