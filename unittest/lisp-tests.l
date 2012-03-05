@@ -23,6 +23,7 @@
     (apply #'make-package name options)))
 
 (deftest fix-list-all-packages-test ()
+  "(list-all-packages) should return 'a copy of' system package list."
   (let* ((name :temporary-package-for-test)
 	 (pkg (make-package name))
 	 (pkglist (list-all-packages)))
