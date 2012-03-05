@@ -3,6 +3,9 @@
   (previous-pseudo-frame)
   => nil)
 
+(defun make-test-package (&rest options)
+  (let ((name (format nil "temporary-package-for-test-~D" (test-uid))))
+    (apply #'make-package name options)))
 
 ;; (make-frame) create strange scratch buffer
 ;(deftest fix-multiframe-create-strange-buffer-test ()
