@@ -877,6 +877,9 @@ Returns list of failures."
 (defun test-uid ()
   (incf *test-uid-counter*))
 
+(defun make-test-package (&rest options)
+  (let ((name (format nil "temporary-package-for-test-~D" (test-uid))))
+    (apply #'make-package name options)))
 
 
 ;;;;; load and run tests automatically
