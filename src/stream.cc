@@ -1316,21 +1316,19 @@ enum
 class StreamAdapter
 {
 public:
-	StreamAdapter(lisp s) 
-	{
-		stream = s;
-	}
-	inline int get()
-	{
-		return getc (xfile_stream_input (stream));
-	}
+  StreamAdapter (lisp s)
+    {
+      stream = s;
+    }
+  inline int get ()
+    {
+      return getc (xfile_stream_input (stream));
+    }
 private:
-	lisp stream;
+  lisp stream;
 };
 
 static const int tofu = 0x81a1;
-
-
 
 static int
 ucs4_to_sjis (ucs4_t ucs4)
@@ -1394,15 +1392,15 @@ readc_stream (lisp stream)
                       case lstream::UTF_8:
                         if (c > 0x7f)
                           {
-							  try
-							  {
-								ucs4_t ucs4 = getch_utf8_to_ucs4(c, StreamAdapter(stream));
-								return ucs4_to_sjis (ucs4);
-							  }
-							  catch(std::exception)
-							  {
-								  return tofu;
-							  }
+                            try
+                              {
+                                ucs4_t ucs4 = getch_utf8_to_ucs4(c, StreamAdapter(stream));
+                                return ucs4_to_sjis (ucs4);
+                              }
+                            catch(std::exception)
+                              {
+                                return tofu;
+                              }
                           }
                         break;
                       default:

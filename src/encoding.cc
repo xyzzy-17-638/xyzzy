@@ -819,7 +819,6 @@ u_char utf8_chtab[] =
 
 u_char utf8_chmask[] = {0x00, 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f};
 
-
 void
 utf8_to_internal_stream::refill_internal ()
 {
@@ -828,14 +827,15 @@ utf8_to_internal_stream::refill_internal ()
       int c = s_in.get ();
       if (c == eof)
         break;
-	  try
-	  {
-		ucs4_t code = getch_utf8_to_ucs4(c, s_in);
-		if(code != UCS4_EOF)
-	        putl (code);
-	  }catch(std::exception)
-	  {
-	  }
+      try
+        {
+          ucs4_t code = getch_utf8_to_ucs4 (c, s_in);
+          if (code != UCS4_EOF)
+            putl (code);
+        }
+      catch (std::exception)
+        {
+        }
     }
 }
 
