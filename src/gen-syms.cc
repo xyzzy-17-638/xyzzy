@@ -1728,6 +1728,8 @@ static symbols ed[] =
   DEFCMD3 (delete-frame, 0, 2, 0, ""),
   MAKE_SYMBOL2 (*before-make-frame-hook*),
   MAKE_SYMBOL2 (*delete-frame-functions*),
+  MAKE_SYMBOL2 (*frame-init-width*),
+  MAKE_SYMBOL2 (*frame-init-height*),
 
   /* insdel.cc */
   DEFUN3 (insert-file-contents, 1, 3, 0),

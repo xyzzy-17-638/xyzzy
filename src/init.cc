@@ -1105,10 +1105,20 @@ init_app(HINSTANCE hinst, ApplicationFrame* app1, ApplicationFrame* parent)
 
   app1->lfp = make_appframe();
 
+  LONG cx = g_initial_size.cx;
+  LONG cy = g_initial_size.cy;
+  long tmp;
+  if(safe_fixnum_value(xsymbol_value(Vframe_init_width), &tmp))
+	  cx = tmp;
+  if(safe_fixnum_value(xsymbol_value(Vframe_init_height), &tmp))
+	  cy = tmp;
+
+  cx = std::max(cx, 20L);
+  cy = std::max(cy, 20L);
 
   app1->toplev = CreateWindow (Application::ToplevelClassName, TitleBarString,
                              WS_OVERLAPPEDWINDOW,
-							 CW_USEDEFAULT, CW_USEDEFAULT, g_initial_size.cx, g_initial_size.cy,
+							 CW_USEDEFAULT, CW_USEDEFAULT, cx, cy,
                              HWND_DESKTOP, 0, hinst, app1);
 
   if (!app1->toplev)

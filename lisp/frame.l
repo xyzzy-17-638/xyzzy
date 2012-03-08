@@ -21,3 +21,6 @@
 (define-key ctl-x-5-map #\1 'delete-other-frames)
 (define-key ctl-x-5-map #\0 'delete-frame)
 
+(defvar *frame-init-width* nil)
+(defvar *frame-init-height* nil)
+
