@@ -731,8 +731,17 @@ utf_to_internal_stream::putl (ucs4_t lc)
     putw (ucs2_t (lc));
   else
     {
-      putw (utf16_ucs4_to_pair_high (lc));
-      putw (utf16_ucs4_to_pair_low (lc));
+      extern int ucs4SurrogatePairToSjis (ucs4_t ucs4);
+      int sjis = ucs4SurrogatePairToSjis (lc);
+      if (sjis)
+        {
+          put ((Char) sjis);
+        }
+      else
+        {
+          putw (utf16_ucs4_to_pair_high (lc));
+          putw (utf16_ucs4_to_pair_low (lc));
+        }
     }
 }
 
@@ -747,7 +756,49 @@ utf16_to_internal_stream::refill_internal_le ()
       int c2 = s_in.get ();
       if (c2 == eof)
         break;
-      putw ((c2 << 8) | c1);
+
+      ucs2_t c = (c2 << 8) | c1;
+      if(utf16_surrogate_high_p (c))
+        {
+          int c3 = s_in.get ();
+          if (c3 == eof)
+            {
+              putw (c);
+              break;
+            }
+          int c4 = s_in.get ();
+          if(c4 == eof)
+            {
+              putw (c);
+              break;
+            }
+          ucs2_t d = (c4 << 8) | c3;
+          if(! utf16_surrogate_low_p (d))
+            {
+              putw (c);
+              s_in.putback (c4);
+              s_in.putback (c3);
+            }
+          else
+            {
+              ucs4_t ucs4 = utf16_pair_to_ucs4 (c, d);
+              extern int ucs4SurrogatePairToSjis (ucs4_t ucs4);
+              int sjis = ucs4SurrogatePairToSjis (ucs4);
+              if (sjis)
+                {
+                  put (sjis);
+                }
+              else
+                {
+                  putw (c);
+                  putw (d);
+                }
+            }
+        }
+      else
+        {
+          putw (c);
+        }
     }
 }
 
@@ -762,7 +813,49 @@ utf16_to_internal_stream::refill_internal_be ()
       int c2 = s_in.get ();
       if (c2 == eof)
         break;
-      putw ((c1 << 8) | c2);
+
+      ucs2_t c = (c1 << 8) | c2;
+      if(utf16_surrogate_high_p (c))
+        {
+          int c3 = s_in.get ();
+          if(c3 == eof)
+            {
+              putw (c);
+              break;
+            }
+          int c4 = s_in.get ();
+          if(c4 == eof)
+            {
+              putw (c);
+              break;
+            }
+          ucs2_t d = (c3 << 8) | c4;
+          if(! utf16_surrogate_low_p (d))
+            {
+              putw (c);
+              s_in.putback (c4);
+              s_in.putback (c3);
+            }
+          else
+            {
+              ucs4_t ucs4 = utf16_pair_to_ucs4 (c, d);
+              extern int ucs4SurrogatePairToSjis (ucs4_t ucs4);
+               int sjis = ucs4SurrogatePairToSjis (ucs4);
+              if (sjis)
+                {
+                  put (sjis);
+                }
+              else
+                {
+                  putw (c);
+                  putw (d);
+                }
+            }
+        }
+      else
+        {
+          putw (c);
+        }
     }
 }
 
@@ -1535,6 +1628,14 @@ internal_to_utf_stream::getw () const
     return eof;
 
   Char cc = Char (c);
+  {
+    extern ucs4_t sjisToSurrogatePair(int sjis);
+    ucs4_t ucs4 = sjisToSurrogatePair(cc);
+    if(ucs4)
+      {
+        return ucs4;
+      }
+  }
 
   if (!(s_flags & ENCODING_UTF_WINDOWS) && cc != Char (-1))
     {
@@ -1580,32 +1681,45 @@ internal_to_utf16le_stream::refill ()
       if (c == eof)
         break;
 
-      ucs2_t wc = ucs2_t (c);
-      if (wc == '\n')
+      if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil && c >= 0x10000)
         {
-          if (s_eol == eol_crlf)
-            {
-              put ('\r');
-              put (0);
-              put ('\n');
-              put (0);
-            }
-          else if (s_eol == eol_lf)
-            {
-              put ('\n');
-              put (0);
-            }
-          else
-            {
-              put ('\r');
-              put (0);
-            }
-          s_nlines++;
+          ucs4_t u4 = (ucs4_t) c;
+          ucs2_t c1 = utf16_ucs4_to_pair_high (u4);
+          ucs2_t c2 = utf16_ucs4_to_pair_low (u4);
+          put ((u_char) (c1));
+          put ((u_char) (c1 >> 8));
+          put ((u_char) (c2));
+          put ((u_char) (c2 >> 8));
         }
       else
         {
-          put (u_char (wc));
-          put (u_char (wc >> 8));
+          ucs2_t wc = ucs2_t (c);
+          if (wc == '\n')
+            {
+              if (s_eol == eol_crlf)
+                {
+                  put ('\r');
+                  put (0);
+                  put ('\n');
+                  put (0);
+                }
+              else if (s_eol == eol_lf)
+                {
+                  put ('\n');
+                  put (0);
+                }
+              else
+                {
+                  put ('\r');
+                  put (0);
+                }
+              s_nlines++;
+            }
+          else
+            {
+              put (u_char (wc));
+              put (u_char (wc >> 8));
+            }
         }
     }
   return finish ();
@@ -1632,32 +1746,45 @@ internal_to_utf16be_stream::refill ()
       if (c == eof)
         break;
 
-      ucs2_t wc = ucs2_t (c);
-      if (wc == '\n')
+      if(xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil && c >= 0x10000)
         {
-          if (s_eol == eol_crlf)
-            {
-              put (0);
-              put ('\r');
-              put (0);
-              put ('\n');
-            }
-          else if (s_eol == eol_lf)
-            {
-              put (0);
-              put ('\n');
-            }
-          else
-            {
-              put (0);
-              put ('\r');
-            }
-          s_nlines++;
+          ucs4_t ucs4 = (ucs4_t) c;
+          ucs2_t c1 = utf16_ucs4_to_pair_high(ucs4);
+          ucs2_t c2 = utf16_ucs4_to_pair_low(ucs4);
+          put ((u_char) (c1 >> 8));
+          put ((u_char) (c1));
+          put ((u_char) (c2 >> 8));
+          put ((u_char) (c2));
         }
       else
         {
-          put (u_char (wc >> 8));
-          put (u_char (wc));
+          ucs2_t wc = ucs2_t (c);
+          if (wc == '\n')
+            {
+              if (s_eol == eol_crlf)
+                {
+                  put (0);
+                  put ('\r');
+                  put (0);
+                  put ('\n');
+                }
+              else if (s_eol == eol_lf)
+                {
+                  put (0);
+                  put ('\n');
+                }
+              else
+                {
+                  put (0);
+                  put ('\r');
+                }
+              s_nlines++;
+            }
+          else
+            {
+              put (u_char (wc >> 8));
+              put (u_char (wc));
+            }
         }
     }
   return finish ();
@@ -1685,15 +1812,23 @@ internal_to_utf8_stream::refill ()
       if (c == eof)
         break;
 
-      ucs2_t wc = ucs2_t (c);
-      ucs4_t lc = wc;
-      if (utf16_surrogate_high_p (wc))
+      ucs4_t lc;
+      if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil && c >= 0x10000)
         {
-          c = s_in.get ();
-          if (utf16_surrogate_low_p (ucs2_t (c)))
-            lc = utf16_pair_to_ucs4 (wc, ucs2_t (c));
-          else
-            s_in.putback (c);
+          lc = c;
+        }
+      else
+        {
+          ucs2_t wc = ucs2_t (c);
+          lc = wc;
+          if (utf16_surrogate_high_p (wc))
+            {
+              int d = s_in.get ();
+              if (utf16_surrogate_low_p (ucs2_t (d)))
+                lc = utf16_pair_to_ucs4 (wc, ucs2_t (d));
+              else
+                s_in.putback (d);
+            }
         }
 
       if (lc < 0x80)
@@ -1844,15 +1979,23 @@ internal_to_utf5_stream::refill ()
       if (c == eof)
         break;
 
-      ucs2_t wc = ucs2_t (c);
-      ucs4_t lc = wc;
-      if (utf16_surrogate_high_p (wc))
+      ucs4_t lc;
+      if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil && c >= 0x10000)
         {
-          c = s_in.get ();
-          if (utf16_surrogate_low_p (ucs2_t (c)))
-            lc = utf16_pair_to_ucs4 (wc, ucs2_t (c));
-          else
-            s_in.putback (c);
+          lc = c;
+        }
+      else
+        {
+          ucs2_t wc = ucs2_t (c);
+          lc = wc;
+          if (utf16_surrogate_high_p (wc))
+            {
+              int d = s_in.get ();
+              if (utf16_surrogate_low_p (ucs2_t (d)))
+                lc = utf16_pair_to_ucs4 (wc, ucs2_t (d));
+              else
+                s_in.putback (d);
+            }
         }
 
       if (!lc)

@@ -2672,6 +2672,7 @@ static symbols ed[] =
   DEFVAR2 (*buffer-list-sort-ignore-case*),
   DEFVAR2 (*wow64-enable-file-system-redirector*),
   DEFVAR2 (*parent-process-wow64-p*),
+  DEFVAR2 (*pseudo-shift-jis-2004-p*),
 };
 
 static void

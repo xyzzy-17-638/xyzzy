@@ -392,15 +392,189 @@ paint_ascii_chars (HDC hdc, int x, int y, int flags, const RECT &r,
               &r, string, len, f.need_pad_p () ? padding : 0);
 }
 
+#include "unicode-3.1-sjis.h"
+
+int
+ucs4SurrogatePairToSjis (ucs4_t ucs4)
+{
+  int ret = 0;
+  if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil && ucs4 >= 0x10000)
+    {
+      const Unicode31Sjis* u = 0;
+      const int n = (int) sizeof (unicode31Sjis) / sizeof (unicode31Sjis[0]);
+      for (int i = 0; i < n; ++i)
+        {
+          const Unicode31Sjis* p = &unicode31Sjis[i];
+          if (p->ucs4 == ucs4)
+            {
+              u = p;
+              break;
+            }
+        }
+      if (u)
+        {
+          ret = u->sjis;
+        }
+    }
+  return ret;
+}
+
+ucs4_t
+sjisToSurrogatePair (int sjis)
+{
+  const Unicode31Sjis* u = 0;
+  if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil)
+    {
+      const int n = (int) sizeof (unicode31Sjis) / sizeof (unicode31Sjis[0]);
+      for (int i = 0; i < n; ++i)
+        {
+          const Unicode31Sjis* p = &unicode31Sjis[i];
+          if (p->sjis == sjis)
+            {
+              u = p;
+              break;
+            }
+        }
+    }
+  if (u)
+    {
+      return u->ucs4;
+    }
+  else
+    {
+      return 0;
+    }
+}
+
+static int
+getUtf16Code (int sjis, wchar_t* out)
+{
+  const int outLen = 2;
+  int ret = 0;
+  if (sjis < 0x100)
+    {
+      char b[2];
+      b[0] = (char) sjis;
+      b[1] = 0;
+      ret = MultiByteToWideChar (CP_ACP, 0, b, 1, out, outLen);
+    }
+  else
+    {
+      ucs4_t ucs4 = (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil) ? sjisToSurrogatePair (sjis) : 0;
+      if (ucs4)
+        {
+          out[0] = utf16_ucs4_to_pair_high (ucs4);
+          out[1] = utf16_ucs4_to_pair_low (ucs4);
+          ret = 2;
+        }
+      else
+        {
+          char b[3];
+          b[0] = (sjis >> 8) & 0xff;
+          b[1] = (sjis >> 0) & 0xff;
+          b[2] = 0;
+          ret = MultiByteToWideChar (CP_ACP, 0, b, 2, out, outLen);
+        }
+    }
+  return ret;
+}
+
 static inline void
 paint_jp_chars (HDC hdc, int x, int y, int flags, const RECT &r,
                 const char *string, int len, const INT *padding)
 {
-  const FontObject &f = active_app_frame().text_font.font (FONT_JP);
-  HGDIOBJ of = SelectObject (hdc, f);
-  ExtTextOut (hdc, x + f.offset ().x, y + f.offset ().y, flags,
-              &r, string, len, f.need_pad_p () ? padding : 0);
-  SelectObject (hdc, of);
+  if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil)
+    {
+      const FontObject &f = active_app_frame ().text_font.font (FONT_JP);
+      bool needPad = f.need_pad_p() && padding;
+
+      wchar_t* wc = (wchar_t*) alloca (sizeof *wc * (len+1));
+      int wcLen = 0;
+
+      int* newPadding = 0;
+      if (needPad)
+        {
+          newPadding = (int*) alloca (sizeof *newPadding * (len+1));
+        }
+      const unsigned char* p = (const unsigned char*) string;
+      for (int ci = 0; ci < len; )
+        {
+          int pad = -1;
+          if (needPad)
+            {
+              pad = padding[ci];
+            }
+          int c = p[ci++];
+          if (SJISP (c))
+            {
+              if (needPad)
+                {
+                  pad += padding[ci];
+                }
+              c = (c << 8) | (p[ci++]);
+            }
+          char b[3] = { 0 };
+          int bLen = 0;
+          wchar_t o[4] = { 0 };
+          int oLen = 0;
+          if (c < 0x100)
+            {
+              b[0] = c;
+              b[1] = 0;
+              bLen = 1;
+              oLen = MultiByteToWideChar (CP_ACP, 0, b, bLen, o, sizeof (o)/sizeof (o[0]));
+              if (oLen)
+                {
+                  for (int i = 0; i < oLen; ++i)
+                    {
+                      if (needPad)
+                        {
+                          newPadding[wcLen] = pad;
+                          pad = 0;
+                        }
+                      wc[wcLen++] = o[i];
+                    }
+                }
+            }
+          else
+            {
+              oLen = getUtf16Code (c, o);
+              if (oLen)
+                {
+                  for (int i = 0; i < oLen; ++i)
+                    {
+                      if (needPad)
+                        {
+                          if (utf16_surrogate_high_p(o[i]))
+                            {
+                              newPadding[wcLen] = 0;
+                            }
+                          else
+                            {
+                              newPadding[wcLen] = pad;
+                              pad = 0;
+                            }
+                        }
+                      wc[wcLen++] = o[i];
+                    }
+                }
+            }
+        }
+      wc[wcLen] = 0;
+
+      HGDIOBJ of = SelectObject (hdc, f);
+      ExtTextOutW (hdc, x + f.offset ().x, y + f.offset ().y, flags,
+                   &r, wc, wcLen, needPad ? newPadding : 0);
+      SelectObject (hdc, of);
+    }
+  else
+    {
+      const FontObject &f = active_app_frame().text_font.font (FONT_JP);
+      HGDIOBJ of = SelectObject (hdc, f);
+      ExtTextOut (hdc, x + f.offset ().x, y + f.offset ().y, flags,
+                  &r, string, len, f.need_pad_p () ? padding : 0);
+      SelectObject (hdc, of);
+    }
 }
 
 static inline void

@@ -497,6 +497,20 @@ ime_composition (ApplicationFrame *app1, HWND hwnd, LPARAM lparam)
                           app1->kbdq.putc (utf16_ucs2_to_undef_pair_high (*sp));
                           cc = utf16_ucs2_to_undef_pair_low (*sp);
                         }
+                      else if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil
+                               && sp+1 < se
+                               && utf16_surrogate_high_p (sp[0])
+                               && utf16_surrogate_low_p (sp[1]))
+                        {
+                          ucs4_t ucs4 = utf16_pair_to_ucs4 (sp[0], sp[1]);
+                          extern int ucs4SurrogatePairToSjis (ucs4_t ucs4);
+                          int sjis = ucs4SurrogatePairToSjis (ucs4);
+                          if (sjis)
+                            {
+                              cc = (Char) sjis;
+                              sp += 1;
+                            }
+                        }
                       app1->kbdq.putc (cc);
                     }
                   lparam &= ~GCS_RESULTSTR;

@@ -470,9 +470,52 @@ Buffer::post_insert_chars (Point &point, int size)
 }
 
 int
-Buffer::insert_chars_internal (Point &point, const insertChars *ichars,
+Buffer::insert_chars_internal (Point &point, const insertChars *ichars_,
                                int nargs, int repeat)
 {
+  insertChars* ichars;
+  if(xsymbol_value (Vpseudo_shift_jis_2004_p) == Qnil)
+    {
+      ichars = (insertChars*) ichars_;
+    }
+  else
+    {
+      ichars = (insertChars*) alloca (sizeof *ichars * nargs);
+      for (int iargs = 0; iargs < nargs; ++iargs)
+        {
+          const insertChars* sc = &ichars_[iargs];
+          insertChars* dc = &ichars[iargs];
+          Char* dstr = (Char*) alloca (sizeof *dstr * sc->length);
+
+          int rest = sc->length;
+          const Char *s = sc->string;
+          Char *w = dstr;
+          for (int i = 0; i < rest; ++i)
+            {
+              Char c = s[i];
+              if (utf16_surrogate_high_p (c) && i < rest-1)
+                {
+                  Char c2 = s[i+1];
+                  if(utf16_surrogate_low_p (c2))
+                    {
+                      ucs4_t ucs4 = utf16_pair_to_ucs4 (c, c2);
+                      extern int ucs4SurrogatePairToSjis (ucs4_t ucs4);
+                      int sjis = ucs4SurrogatePairToSjis (ucs4);
+                      if (sjis)
+                        {
+                          c = sjis;
+                          i += 1;
+                        }
+                    }
+                }
+              *w++ = c;
+            }
+
+          dc->string  = dstr;
+          dc->length  = (int) (w - dstr);
+        }
+    }
+
   double total_length = 0;
   int i;
   for (i = 0; i < nargs; i++)
@@ -1139,9 +1182,10 @@ make_cf_wtext (CLIPBOARDTEXT &clp, lisp string)
   const Char *s = xstring_contents (string);
   const Char *const se = s + xstring_length (string);
 
+  extern ucs4_t sjisToSurrogatePair(int sjis);
   int extra;
   for (extra = 0; s < se; s++)
-    if (*s == '\n')
+    if (*s == '\n' || sjisToSurrogatePair (*s))
       extra++;
 
   clp.fmt = CF_UNICODETEXT;
@@ -1153,18 +1197,29 @@ make_cf_wtext (CLIPBOARDTEXT &clp, lisp string)
     {
       if (*s == '\n')
         *b++ = '\r';
-      ucs2_t c = i2w (*s);
-      if (c == ucs2_t (-1))
-        {
-          if (utf16_undef_char_high_p (*s) && s < se - 1
-              && utf16_undef_char_low_p (s[1]))
-            {
-              c = utf16_undef_pair_to_ucs2 (*s, s[1]);
-              s++;
-            }
-          else
-            c = DEFCHAR;
-        }
+
+      ucs2_t c;
+      ucs4_t ucs4 = sjisToSurrogatePair (*s);
+        if(ucs4)
+          {
+            *b++ = utf16_ucs4_to_pair_high (ucs4);
+            c = utf16_ucs4_to_pair_low (ucs4);
+          }
+        else
+          {
+            c = i2w (*s);
+            if (c == ucs2_t (-1))
+              {
+                if (utf16_undef_char_high_p (*s) && s < se - 1
+                    && utf16_undef_char_low_p (s[1]))
+                  {
+                    c = utf16_undef_pair_to_ucs2 (*s, s[1]);
+                    s++;
+                  }
+                else
+                  c = DEFCHAR;
+              }
+          }
       *b++ = c;
     }
   *b = 0;
