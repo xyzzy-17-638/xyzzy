@@ -7,7 +7,7 @@
 
 (in-package "editor")
 
-(export '(delete-other-frames))
+(export '(delete-other-frames *frame-init-width* *frame-init-height*))
 
 (defun delete-other-frames() 
   (interactive)
