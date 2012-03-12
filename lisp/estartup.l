@@ -104,14 +104,22 @@
 (defun *xyzzycli-helper (dir args)
   (si:*show-window-foreground)
   (let ((si:*command-line-args*
-	 (mapcan #'(lambda (arg)
-		     (let ((wild (ignore-errors (merge-pathnames arg dir))))
-		       (or (and wild
-				(wild-pathname-p wild)
-				(directory wild :absolute t))
-			   (list arg))))
-		 args))
-	waitobj)
+     (mapcan #'(lambda (arg)
+             (let ((wild (ignore-errors (merge-pathnames arg dir))))
+               (or (and wild
+                        (wild-pathname-p wild)
+                        (directory wild :absolute t))
+                   (if (equal arg "-wow64-parent")
+                       (progn
+                         (setq *parent-process-wow64-p* t)
+                         nil)
+                     (if (equal arg "-no-wow64-parent")
+                         (progn
+                           (setq *parent-process-wow64-p* nil)
+                           nil)
+                       (list arg))))))
+                 args))
+        waitobj)
     (when (equal (car si:*command-line-args*) "-wait")
       (setq waitobj (si:*create-wait-object))
       (pop si:*command-line-args*))
