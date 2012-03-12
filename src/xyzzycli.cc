@@ -577,43 +577,47 @@ public:
       return ret;
     }
 
-  void cmdlineFixup (int &ac, char **&av, const char *const cl, int nchars, const config &cf)
+  void cmdlineFixup (int &ac, char **av)
     {
       bool haveWow64Option = false;
       int lastSpecialOption = 0;
       for (int i = 1; i < ac; ++i)
-	    {
+        {
           const char* o = av[i];
           if (lstrcmp (o, "-image") == 0 || lstrcmp (o, "-config") == 0 || lstrcmp (o, "-ini") == 0)
-	        {
-              lastSpecialOption = i + 1;
+            {
+              if (i < ac-1)
+                {
+                  lastSpecialOption = i + 1;
+                }
+              else
+                {
+                  lastSpecialOption = i;
+                }
             }
-	      else if (lstrcmp (o, "-q") == 0 || lstrcmp (o, "-no-init-file") == 0)
-	        {
+          else if (lstrcmp (o, "-q") == 0 || lstrcmp (o, "-no-init-file") == 0 || lstrcmp (o, "-wait") == 0)
+            {
               lastSpecialOption = i;
             }
-	      else if (lstrcmp (o, "-no-wow64-redirection") == 0 || lstrcmp (o, "-wow64-redirection") == 0)
-	        {
+          else if (lstrcmp (o, "-no-wow64-redirection") == 0 || lstrcmp (o, "-wow64-redirection") == 0)
+            {
               haveWow64Option = true;
             }
         }
 
       if (! haveWow64Option)
-	    {
+        {
           ac += 1;
-          int ac2;
-          av = (char **)_alloca (sizeof *av * (ac + 1) + nchars);
-          parse_cmdline (cl, (char *)(av + ac + 1), ac2, av, cf);
           for (int i = ac-1; i > lastSpecialOption+1; --i)
-	        {
+            {
               av[i] = av[i-1];
             }
           if (IsParentProcessWow64 ())
-	        {
+            {
               av[lastSpecialOption+1] = "-wow64-redirection";
             }
-	      else
-	        {
+          else
+            {
               av[lastSpecialOption+1] = "-no-wow64-redirection";
             }
         }
@@ -633,14 +637,14 @@ process_startup ()
   const char *const cl = GetCommandLine ();
   int ac;
   int nchars = parse_cmdline (cl, 0, ac, 0, cf);
-  char **av = (char **)_alloca (sizeof *av * (ac + 1) + nchars);
-  parse_cmdline (cl, (char *)(av + ac + 1), ac, av, cf);
+  char **av = (char **)_alloca (sizeof *av * (ac + 2) + nchars);
+  parse_cmdline (cl, (char *)(av + ac + 2), ac, av, cf);
 
   Wow64 wow;
   if (wow.IsWow64())
     {
-      wow.cmdlineFixup(ac, av, cl, nchars, cf);
-	}
+      wow.cmdlineFixup(ac, av);
+    }
 
   ExitProcess (xmain (ac, av, cf.xyzzy, cf.multi_instance));
 }
