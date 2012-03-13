@@ -1,6 +1,7 @@
 #include "ed.h"
 #include <imm.h>
 #include <process.h>
+#include "appid.h"
 #include "ctl3d.h"
 #include "environ.h"
 #include "fnkey.h"
@@ -626,6 +627,8 @@ toplevel_wnd_create(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
   CREATESTRUCT *cs = (CREATESTRUCT *)lparam;
   ApplicationFrame *app1 = (ApplicationFrame *)cs->lpCreateParams;
+
+  appid::set ();
   app1->toplev = hwnd;
   insert_app_frame(hwnd, app1);
   app1->hwnd_sw = CreateStatusWindow ((SBARS_SIZEGRIP | WS_CHILD | WS_VISIBLE
