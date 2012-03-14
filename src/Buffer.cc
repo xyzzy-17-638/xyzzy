@@ -3,6 +3,7 @@
 #include "filer.h"
 #include "binfo.h"
 #include "buffer-bar.h"
+#include "version.h"
 #include "environ.h"
 #include <map>
 
