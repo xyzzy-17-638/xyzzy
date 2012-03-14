@@ -15,6 +15,7 @@ public:
              const char *const *rsuffixes)
        : ar_csuffixes (csuffixes),
          ar_esuffixes (esuffixes), ar_rsuffixes (rsuffixes) {}
+  static const char *const null_suffixes[];
 
   virtual int check_archive (const char *) const = 0;
   virtual int extract (HWND, const char *, const char *, const char *) const = 0;
@@ -24,7 +25,7 @@ public:
   virtual lisp list (const char *path, int file_name_only) const = 0;
   virtual void puts_extract (FILE *, char *) const = 0;
 
-  virtual int create (HWND, const char *, const char *) const = 0;
+  virtual int create (HWND, const char *, const char *) const =0;
   virtual int create_sfx (HWND, const char *, const char *) const = 0;
   virtual void puts_create (FILE *, char *, const char *) const = 0;
   virtual int remove (HWND, const char *, const char *) const = 0;
@@ -38,15 +39,34 @@ public:
     {return match_suffix (path, l, ar_rsuffixes);}
   int match_suffix (const char *, int, const char *const *) const;
   virtual int reliable_checker_p () const {return 1;}
-  virtual const char *match_any () const {return "";}
 };
+
+class UnzipBuiltin: public ArchiverP
+{
+  static const char *const esuffixes[];
+public:
+  UnzipBuiltin () : ArchiverP (null_suffixes, esuffixes, null_suffixes) {}
+  virtual int check_archive (const char *) const ;
+  virtual int extract (HWND, const char *, const char *, const char *) const ;
+  virtual   WORD get_version () const ;
+  virtual   WORD get_sub_version () const ;
+  virtual BOOL config_dialog (HWND hwnd, LPSTR buf, int mode) const ;
+  virtual lisp list (const char *path, int file_name_only) const ;
+  virtual void puts_extract (FILE *, char *) const ;
+
+  virtual int create (HWND, const char *, const char *) const {return ERROR_NOT_SUPPORT; }
+  virtual int create_sfx (HWND, const char *, const char *) const {return ERROR_NOT_SUPPORT; }
+  virtual void puts_create (FILE *, char *, const char *) const;
+  virtual int remove (HWND, const char *, const char *) const {return ERROR_NOT_SUPPORT; }
+
+};
+
 
 class ArchiverPCommonArchiverImpl : public ArchiverP
 {
 public:
   const ArchiverInterface &ar_interface;
 protected:
-  static const char *const null_suffixes[];
   ArchiverPCommonArchiverImpl (const ArchiverInterface &i,
              const char *const *csuffixes,
              const char *const *esuffixes,
@@ -68,6 +88,7 @@ protected:
   static void sepsl (char *path) {sepmap (path, '\\', '/');}
   static void sepbacksl (char *path) {sepmap (path, '/', '\\');}
 public:
+  virtual const char *match_any () const {return "";}
   virtual int check_archive (const char *) const;
   virtual int extract (HWND, const char *, const char *, const char *) const
     {return ERROR_NOT_SUPPORT;}
@@ -132,6 +153,7 @@ public:
   virtual int create_sfx (HWND, const char *, const char *) const;
   virtual const char *match_any () const {return "*.*";}
 };
+
 
 class Unzip: public ArchiverPCommonArchiverImpl
 {
@@ -232,6 +254,7 @@ protected:
   Arj a_arj;
   Lha a_lha;
   Unzip a_unzip;
+  UnzipBuiltin a_unzip_bulitin;
   Zip a_zip;
   Cab a_cab;
   Unrar a_unrar;
@@ -239,7 +262,7 @@ protected:
   Yz1 a_yz1;
   UnGCA a_ungca;
   SevenZip a_seven_zip;
-  enum {NARCS = 12};
+  enum {NARCS = 13};
   ArchiverP *arcs[NARCS];
 
   static int check_file_size (const char *);

@@ -111,7 +111,7 @@ ArchiverP::match_suffix (const char *path, int l,
 }
 
 
-const char *const ArchiverPCommonArchiverImpl::null_suffixes[] = {0};
+const char *const ArchiverP::null_suffixes[] = {0};
 
 void
 ArchiverPCommonArchiverImpl::sepmap (char *s, int f, int t)
@@ -677,6 +677,192 @@ zip_puts (FILE *fp, const char *name)
     }
 }
 
+#include "unzip.h"
+#include <map>
+#include <string>
+using std::string;
+using std::map;
+const char *const UnzipBuiltin::esuffixes[] = {".zip", 0};
+
+static int
+parse_resp_file(map<string, bool> &targets, const char *respfile)
+{
+  stdio_file fp (fopen (respfile, "rb"));
+  if (!fp)
+    return ERROR_FILE_OPEN;
+  size_t size = _filelength (_fileno (fp));
+  safe_ptr <char> buf = new char [size + 1];
+  if (fread (buf , 1, size, fp) != size)
+    return ERROR_CANNOT_READ;
+  buf[size] = 0;
+  char *begin = buf;
+  for (char *p = buf; *p; p++)
+  {
+    if (*p == '\r' || *p == '\n')
+	{
+      // *p = ' ';
+	  string path(begin, p-begin);
+	  targets[path] = true;
+	  begin = p+1;
+	}
+  }
+  return 1;
+}
+
+static void
+notify_message(HWND notify, const char* name)
+{
+	if(notify)
+	{
+		static const UINT extract = RegisterWindowMessage (WM_ARCEXTRACT);
+		static EXTRACTINGINFO info;
+
+		ZeroMemory(&info, sizeof(EXTRACTINGINFO));
+		strcpy_s(info.szDestFileName, FNAME_MAX32+1, name);
+
+		SendMessage(notify, extract, 0, (LPARAM) &info);
+	}
+}
+
+static int
+extract_zip_builtin(HWND notify, const char *path,
+                const char *destdir, const char *respfile)
+{
+
+  map<string, bool> targets;
+  if(*respfile) 
+  {
+	 int res = parse_resp_file(targets, respfile);
+	 if(res > 0x8000)
+		 return res;
+  }
+  HZIP hz;
+  hz = OpenZip(path,0);
+  SetUnzipBaseDir(hz,destdir);
+  ZIPENTRY ze;
+  GetZipItem(hz,-1,&ze);
+  int numitems=ze.index;
+
+  for (int zi=0; zi<numitems; zi++)
+  {
+    GetZipItem(hz,zi,&ze);
+	notify_message(notify, ze.name);
+    if(targets.empty() || targets[ze.name])
+      UnzipItem(hz,zi,ze.name);
+  }
+  CloseZip(hz);
+  return 1;
+}
+
+int
+UnzipBuiltin::extract (HWND hwnd, const char *path,
+                const char *destdir, const char *respfile) const
+{
+  HWND hfocus = GetFocus ();
+  HWND notify = create_notify_window (hwnd);
+  bool enabled = hwnd && IsWindowEnabled (hwnd);
+
+  int res = extract_zip_builtin(notify, path, destdir, respfile);
+
+  if (enabled)
+    EnableWindow (hwnd, 1);
+  active_app_frame().status_window.puts ("done", 1);
+  if (notify)
+    {
+      DestroyWindow (notify);
+    }
+  if (hfocus)
+    SetFocus (hfocus);
+  return 0;
+}
+
+void
+UnzipBuiltin::puts_extract (FILE *fp, char *name) const
+{
+  zip_puts (fp, name);
+}
+
+void
+UnzipBuiltin::puts_create (FILE *fp, char *, const char*) const
+{
+	throw std::exception("unimplement, but never called");
+}
+
+int
+UnzipBuiltin::check_archive (const char *path) const
+{
+	int res = 0;
+	HZIP handle = OpenZip(path,0);
+	if(handle) {
+		res = 1;
+		CloseZip(handle);
+	}
+	return res;
+}
+
+WORD
+UnzipBuiltin::get_version () const
+{
+	return 1;
+}
+
+WORD
+UnzipBuiltin::get_sub_version () const
+{
+	return 25;
+}
+
+BOOL
+UnzipBuiltin::config_dialog (HWND hwnd, LPSTR buf, int mode) const
+{
+	return FALSE;
+}
+
+lisp
+UnzipBuiltin::list (const char *path, int file_name_only) const
+{
+    lisp result = Qnil;
+    protect_gc gcpro (result);
+
+	HZIP hz;
+	hz = OpenZip(path,0);
+	if(!hz)
+		return Qnil;
+	ZIPENTRY ze;
+	GetZipItem(hz,-1,&ze);
+	int numitems=ze.index;
+
+	for (int zi=0; zi<numitems; zi++)
+	{
+		GetZipItem(hz,zi,&ze);
+		if (file_name_only)
+			result = xcons (make_string (ze.name), result);
+		else
+		{
+			SYSTEMTIME systime;
+			FileTimeToSystemTime(&ze.ctime, &systime);
+
+			result = xcons (make_list
+							(make_string (ze.name),
+								make_string (ze.attr),
+								make_integer (long_to_large_int (ze.unc_size)),
+								make_list (make_fixnum (systime.wYear),
+								make_fixnum (systime.wMonth),
+								make_fixnum (systime.wDay),
+								make_fixnum (systime.wHour),
+								make_fixnum (systime.wMinute),
+								make_fixnum (systime.wSecond), /* why *2?  d.b.sec * 2 */
+										0),
+								0),
+							result);
+		}
+	}
+    CloseZip(hz);
+
+    return Fnreverse (result);
+}
+
+
 const char *const Unzip::esuffixes[] = {".zip", ".exe", 0};
 
 int
@@ -866,6 +1052,7 @@ Archiver::Archiver ()
   arcs[9] = &a_yz1;
   arcs[10] = &a_ungca;
   arcs[11] = &a_seven_zip;
+  arcs[12] = &a_unzip_bulitin; // this should be later than a_unzip.
 }
 
 const ArchiverP *
