@@ -83,6 +83,15 @@
   )
 
 
+(deftest lisp-implementation-type ()
+  (lisp-implementation-type)
+  => "xyzzy")
+
+(deftest lisp-implementation-version ()
+  (= (software-version) (lisp-implementation-version))
+  => t)
+
+
 (deftest machine-instance ()
   (string= (machine-instance) (machine-name))
   => t)
