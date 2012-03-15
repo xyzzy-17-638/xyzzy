@@ -43,7 +43,7 @@
       (os-platform)
       => windows-vista)
     (deftest user-config-path-and-dump-image-path-vista-test ()
-      "(user-config-path) and (si:dump-image-path) は wxp のまま"
+      "(user-config-path) and (si:dump-image-path) は wxp のまま。0.2.2.235 でもパスする"
       (values (pathname-name (user-config-path))
               (pathname-type (si:dump-image-path)))
       => "wxp"
@@ -59,7 +59,7 @@
       (os-platform)
       => windows-7)
     (deftest user-config-path-and-dump-image-path-7-test ()
-      "(user-config-path) and (si:dump-image-path) は wxp のまま"
+      "(user-config-path) and (si:dump-image-path) は wxp のまま。0.2.2.235 でもパスする"
       (values (pathname-name (user-config-path))
               (pathname-type (si:dump-image-path)))
       => "wxp"
@@ -75,7 +75,7 @@
       (os-platform)
       => windows-8)
     (deftest user-config-path-and-dump-image-path-8-test ()
-      "(user-config-path) and (si:dump-image-path) は wxp のまま"
+      "(user-config-path) and (si:dump-image-path) は wxp のまま。0.2.2.235 でもパスする"
       (values (pathname-name (user-config-path))
               (pathname-type (si:dump-image-path)))
       => "wxp"
