@@ -232,7 +232,7 @@ main ()
   make_ss_table ();
 
   printf ("#define FULL_WIDTH_HIRAGANA_MIN 0x829f\n");
-  printf ("#define FULL_WIDTH_HIRAGANA_MAX 0x82f1\n");
+  printf ("#define FULL_WIDTH_HIRAGANA_MAX 0x82f2\n");
   printf ("#define FULL_WIDTH_KATAKANA_MIN 0x8340\n");
   printf ("#define FULL_WIDTH_KATAKANA_MAX 0x8396\n");
 

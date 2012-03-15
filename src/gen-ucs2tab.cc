@@ -881,6 +881,7 @@ make_cp932 (ucs2_t *wbuf)
         wbuf[i] = wc;
     }
 
+  wbuf[0x82f2] = 0x3094;
   for (int i = 0xe000; i <= 0xfcff; i++)
     {
       mb[0] = i >> 8;
@@ -1053,7 +1054,9 @@ output_simple (const ucs2_t *wbuf, const char *type, const char *name)
 int
 main ()
 {
-  static const struct {const char *file, *name; int charset;} cs[] =
+fprintf (stderr, "\n\n\n*** gen-ucs2tab.cc ***\n\n\n");
+
+	static const struct {const char *file, *name; int charset;} cs[] =
     {
       {"unicode/8859-1.TXT", "iso8859_1", ccs_iso8859_1},
       {"unicode/8859-2.TXT", "iso8859_2", ccs_iso8859_2},
@@ -1143,6 +1146,9 @@ main ()
   make_cns11643 (big5, gb2312);
 
   make_cp932 (int2wc);
+	if(int2wc[0x82f1] == 0x3093) {
+		fprintf(stderr, "%s(%d)\n", __FILE__, __LINE__);
+	}
 
   merge_int2wc (int2wc, jisx0212, numberof (jisx0212), CCS_JISX0212_MIN);
   merge_int2wc (int2wc, ksc5601, numberof (ksc5601), CCS_KSC5601_MIN);
@@ -1160,6 +1166,30 @@ main ()
 #endif
 
   output_simple (int2wc, "ucs2_t", "internal2wc_table");
+
+	{
+		FILE* fp = fopen("jisx0212-out.txt", "wt");
+		for(int i = 0; i < sizeof(jisx0212)/sizeof(jisx0212[0]); ++i) {
+			if((i & 15) == 0) {
+				fprintf(fp, "\n%04x : ", i);
+			}
+			fprintf(fp, "%04x ", jisx0212[i]);
+		}
+		fprintf(fp, "\n");
+		fclose(fp);
+	}
+
+	{
+		FILE* fp = fopen("int2wc-out.txt", "wt");
+		for(int i = 0; i < sizeof(int2wc)/sizeof(int2wc[0]); ++i) {
+			if((i & 15) == 0) {
+				fprintf(fp, "\n%04x : ", i);
+			}
+			fprintf(fp, "%04x ", int2wc[i]);
+		}
+		fprintf(fp, "\n");
+		fclose(fp);
+	}
 
   return 0;
 }
