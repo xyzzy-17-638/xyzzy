@@ -691,6 +691,8 @@ init_lisp_objects ()
   const char *config_path = 0, *ini_file = 0;
   *g_app.dump_image = 0;
 
+  bool redump = false;
+
   int ac;
   for (ac = 1; ac < __argc - 1; ac += 2)
     if (!strcmp (__argv[ac], "-image"))
@@ -705,6 +707,8 @@ init_lisp_objects ()
       config_path = __argv[ac + 1];
     else if (!strcmp (__argv[ac], "-ini"))
       ini_file = __argv[ac + 1];
+    else if (!strcmp (__argv[ac], "-redump"))
+      redump  =true;
     else
       break;
 
@@ -712,10 +716,10 @@ init_lisp_objects ()
     {
       if (!ini_file)
         ini_file = getenv ("XYZZYINIFILE");
-	  init_user_inifile_path_1st_phase(ini_file);
+      init_user_inifile_path_1st_phase(ini_file);
 
       init_dump_path ();
-      if ((ac < __argc || !check_dump_key ())
+      if ((!redump && (ac < __argc || !check_dump_key ()))
           && rdump_xyzzy ())
         {
           combine_syms ();
@@ -727,6 +731,10 @@ init_lisp_objects ()
           init_symbol_value_once ();
           init_condition ();
         }
+	  if(redump)
+	  {
+		  set_undumped();
+	  }
       init_symbol_value ();
       init_syntax_spec ();
       init_env_symbols (config_path, ini_file);

@@ -131,6 +131,7 @@ void gc (int);
 void init_syms ();
 void combine_syms ();
 int rdump_xyzzy ();
+void set_undumped();
 void cleanup_lisp_objects ();
 
 void rehash_all_hash_tables ();

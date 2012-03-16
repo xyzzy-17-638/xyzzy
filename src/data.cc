@@ -2797,6 +2797,13 @@ rdump_xyzzy (FILE *fp)
 
 static int dump_flag;
 
+void
+set_undumped()
+{
+	dump_flag = 0;
+}
+
+
 int
 rdump_xyzzy ()
 {
