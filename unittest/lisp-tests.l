@@ -215,6 +215,7 @@
   => nil
   => nil
   => nil
+  => nil
   => nil)
 
 (deftest test-defpackage-parse-options-2 ()
@@ -747,3 +748,34 @@ lisp-indent-hook property"
     (path-equal path (truename path)))
   => t)
 
+(deftest test-defpackage-parse-options-1 ()
+  (lisp::defpackage-parse-options
+   :foo
+   '((:documentation "hogehoge")
+     (:documentation "fugafuga")))
+  => nil
+  => nil
+  => nil
+  => nil
+  => nil
+  => nil
+  => nil
+  => nil
+  => nil
+  => "fugafuga")
+
+(deftest defpackage-documentation ()
+  (let* ((pkg-name (gensym "pkg-")))
+    (eval
+     `(defpackage ,pkg-name
+        (:documentation "test package")))
+    (documentation (find-package pkg-name) t))
+  => "test package")
+
+(deftest defpackage-documentation-wrong-doc-type ()
+  (let* ((pkg-name (gensym "pkg-")))
+    (eval
+     `(defpackage ,pkg-name
+        (:documentation "test package")))
+    (documentation (find-package pkg-name) nil))
+  !! si::check-type-error)
