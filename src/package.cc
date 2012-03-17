@@ -454,6 +454,7 @@ Fdelete_package (lisp package)
     }
   xpackage_name (package) = Qnil;
   xpackage_nicknames (package) = Qnil;
+  xpackage_documentation (package) = Qnil;
   return Qt;
 }
 
@@ -634,6 +635,20 @@ lisp
 Fsi_package_external (lisp package)
 {
   return xpackage_external (coerce_to_package (package));
+}
+
+lisp
+Fsi_package_documentation (lisp package)
+{
+  return xpackage_documentation (coerce_to_package (package));
+}
+
+lisp
+Fsi_set_package_documentation (lisp package, lisp documentation)
+{
+  check_string (documentation);
+  xpackage_documentation (coerce_to_package (package)) = documentation;
+  return documentation;
 }
 
 static lisp
