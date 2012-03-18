@@ -334,7 +334,7 @@ StartXyzzy()
 	memset (&si, 0, sizeof si);
 	si.cb = sizeof si;
 	// why not const!
-	if (!CreateProcess (0, (LPTSTR)cmdline.c_str(), 0, 0, 1, CREATE_NEW_PROCESS_GROUP, 0, 0, &si, &pi))
+	if (!CreateProcess (0, (LPTSTR)cmdline.c_str(), 0, 0, 0, CREATE_NEW_PROCESS_GROUP, 0, 0, &si, &pi))
 		return false;
 	CloseHandle (pi.hProcess);
 	CloseHandle (pi.hThread);
@@ -357,7 +357,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 
 	if(__argc == 2)
 	{
-		DWORD pid = atoi(__argv[1]);
+		DWORD pid = _wtoi(__wargv[1]);
 		if(pid == 0)
 		{
 			ErrorBox(_T("Invalid process id."));

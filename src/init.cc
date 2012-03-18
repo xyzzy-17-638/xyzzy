@@ -1137,9 +1137,61 @@ init_app(HINSTANCE hinst, ApplicationFrame* app1, ApplicationFrame* parent)
   return 1;
 }
 
+static bool
+DirExists(LPCTSTR fullPath)
+{
+	DWORD res = GetFileAttributes(fullPath);
+	return res != -1 && (res & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+
+static bool
+ExistsNewFolder()
+{
+	TCHAR path[MAX_PATH];
+	ResolveModuleRelativeDir(path, MAX_PATH, "xyzzy_new");
+	return DirExists(path);
+}
+
+#include <string>
+using std::string;
+
+static bool
+LaunchUpdater()
+{
+	DWORD pid = GetCurrentProcessId();
+	char exepath[MAX_PATH];
+	ResolveModuleRelativePath(exepath, MAX_PATH, NULL, "updater.exe");
+	string cmdline(exepath);
+	cmdline += " ";
+	char buf[256];
+	_itoa_s(pid, buf, 10);
+	cmdline += buf;
+
+	PROCESS_INFORMATION pi;
+	STARTUPINFO si;
+	memset (&si, 0, sizeof si);
+	si.cb = sizeof si;
+	if (!CreateProcess (0, (LPSTR)cmdline.c_str(), 0, 0, 0, CREATE_NEW_PROCESS_GROUP, 0, 0, &si, &pi))
+		return false;
+	CloseHandle (pi.hProcess);
+	CloseHandle (pi.hThread);
+
+	return true;
+}
+
+
 int PASCAL
 WinMain (HINSTANCE hinst, HINSTANCE, LPSTR, int cmdshow)
 {
+  if (ExistsNewFolder())
+  {
+	  if(LaunchUpdater())
+		  return 0;
+	  MessageBox(NULL, "Fail to launch updater", "Error", MB_ICONERROR);
+	  return 1;
+  }
+
   int ole_initialized = 0;
   if (init_root_app (hinst, cmdshow, ole_initialized))
     {
