@@ -964,6 +964,24 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
                    (error "unknown error~@[: ~S~]" error))))
       (#1#     (error "result not sent.")))))
 
+(defun with-another-xyzzy--delete-tmpbuf (tmpbuf time-limit)
+  (handler-case
+      (delete-buffer tmpbuf)
+    (error ()
+      (labels ((delete-tmpbuf ()
+                 (labels ((again () (start-timer 1 #'delete-tmpbuf t)))
+                   (cond ((deleted-buffer-p tmpbuf)
+                          (message "tmpbuf deleted successfully."))
+                         ((eql (process-status proc) :exit)
+                          (handler-case
+                              (delete-buffer tmpbuf)
+                            (error () (again))))
+                         ((> (get-internal-real-time)
+                             time-limit)
+                          (message "give up to delete tmpbuf ~S, sorry."
+                                   (buffer-name tmpbuf)))
+                         (t (again))))))
+        (start-timer 6 #'delete-tmpbuf t)))))
 
 (defmacro with-another-xyzzy ((&key (options "") (timeout 60) (show :show))
                               &body body)
@@ -987,23 +1005,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
                  ;; FIXME: when another xyzzy doesn't close properly, it stay
                  ;; in front so user can't see test progress.
                  (activate-xyzzy-window (si:*instance-number))
-                 (handler-case
-                     (delete-buffer tmpbuf)
-                   (error ()
-                     (labels ((delete-tmpbuf ()
-                                (labels ((again () (start-timer 1 #'delete-tmpbuf t)))
-                                  (cond ((deleted-buffer-p tmpbuf)
-                                         (message "tmpbuf deleted successfully."))
-                                        ((eql (process-status proc) :exit)
-                                         (handler-case
-                                             (delete-buffer tmpbuf)
-                                           (error () (again))))
-                                        ((> (get-internal-real-time)
-                                            (+ create-time 180000))
-                                         (message "give up to delete tmpbuf ~S, sorry."
-                                                  (buffer-name tmpbuf)))
-                                        (t (again))))))
-                       (start-timer 6 #'delete-tmpbuf t)))))))
+                 (with-another-xyzzy--delete-tmpbuf tmpbuf (+ create-time 180000)))))
            (with-another-xyzzy--read-results tmpfile))
        (delete-file tmpfile))))
 (setf (get 'with-another-xyzzy 'ed:lisp-indent-hook) 1)
