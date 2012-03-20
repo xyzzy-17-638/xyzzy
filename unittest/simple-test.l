@@ -986,8 +986,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
 (defmacro with-another-xyzzy ((&key (options "") (timeout 60) (show :show))
                               &body body)
   `(let* ((tmpfile (make-temp-file-name))
-          (create-time (file-write-time tmpfile))
-          (out (gensym "tmpfile-stream-")))
+          (create-time (file-write-time tmpfile)))
      (unwind-protect
          (let ((command-string
                  (with-another-xyzzy--make-command-string
