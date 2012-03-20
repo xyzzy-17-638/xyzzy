@@ -985,7 +985,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
                          (t (again)))))
           (start-timer 6 #'delete-tmpbuf t))))))
 
-(defun with-another-xyzzy (body &key (options "") (timeout 60) (show :show))
+(defun with-another-xyzzy (body &key (options "") (timeout 60))
   (let* ((tmpfile (make-temp-file-name))
          (create-time (file-write-time tmpfile)))
     (unwind-protect
