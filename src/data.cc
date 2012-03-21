@@ -2795,7 +2795,7 @@ rdump_xyzzy (FILE *fp)
   return 1;
 }
 
-static int dump_flag;
+static int dump_flag = 0;
 
 int
 rdump_xyzzy ()

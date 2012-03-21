@@ -308,3 +308,6 @@
 
 (export 'show-dexplorer)
 (autoload 'show-dexplorer "dexplorer" t)
+
+(export 'check-update)
+(autoload 'check-update "ni/update-xyzzy" t)

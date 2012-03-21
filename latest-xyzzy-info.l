@@ -1,0 +1,5 @@
+("name" . "Xyzzy Multiframe Version")
+("author" . "mumurik765")
+("url" . "https://raw.github.com/mumurik/xyzzy/tree/ni-integrate/latest-xyzzy-info.l")
+("description" . "Xyzzyのマルチフレーム版配布サイトです。")
+("packages" (("name" . "xyzzy") ("version" . "0.2.3.5.1") ("author" . "mumurik765") ("file" . "updatetest4.zip") ("src" . "http://cdn.bitbucket.org/mumurik/xyzzy/downloads/updatetest4.zip") ("description" . "updaterテスト用の第4バージョン。") ("category") ("md5" . "24d5249b4f80b54146126a6108ef58d7") ("time" . 3541306883) ("depends") ("changes" . "updaterテスト用4。") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))

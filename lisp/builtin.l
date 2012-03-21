@@ -679,6 +679,7 @@
 (si::defun-builtin count-buffers (&optional all))
 (si::defun-builtin kill-xyzzy ())
 (si::defun-builtin prepare-for-kill-xyzzy ())
+(si::defun-builtin restart-for-update ())
 (si::defun-builtin lock-file (&optional buffer))
 (si::defun-builtin unlock-file (&optional buffer))
 (si::defun-builtin file-locked-p (&optional buffer))

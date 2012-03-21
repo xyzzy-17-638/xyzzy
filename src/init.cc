@@ -692,6 +692,8 @@ init_lisp_objects ()
   const char *config_path = 0, *ini_file = 0;
   *g_app.dump_image = 0;
 
+  bool redump = false;
+
   int ac;
   for (ac = 1; ac < __argc - 1; ac += 2)
     if (!strcmp (__argv[ac], "-image"))
@@ -706,6 +708,8 @@ init_lisp_objects ()
       config_path = __argv[ac + 1];
     else if (!strcmp (__argv[ac], "-ini"))
       ini_file = __argv[ac + 1];
+    else if (!strcmp (__argv[ac], "-redump"))
+      redump  =true;
     else
       break;
 
@@ -713,10 +717,10 @@ init_lisp_objects ()
     {
       if (!ini_file)
         ini_file = getenv ("XYZZYINIFILE");
-	  init_user_inifile_path_1st_phase(ini_file);
+      init_user_inifile_path_1st_phase(ini_file);
 
       init_dump_path ();
-      if ((ac < __argc || !check_dump_key ())
+      if ((!redump && (ac < __argc || !check_dump_key ()))
           && rdump_xyzzy ())
         {
           combine_syms ();
@@ -1132,9 +1136,61 @@ init_app(HINSTANCE hinst, ApplicationFrame* app1, ApplicationFrame* parent)
   return 1;
 }
 
+static bool
+DirExists(LPCTSTR fullPath)
+{
+	DWORD res = GetFileAttributes(fullPath);
+	return res != -1 && (res & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+
+static bool
+ExistsNewFolder()
+{
+	TCHAR path[MAX_PATH];
+	ResolveModuleRelativeDir(path, MAX_PATH, "xyzzy_new");
+	return DirExists(path);
+}
+
+#include <string>
+using std::string;
+
+bool
+LaunchUpdater()
+{
+	DWORD pid = GetCurrentProcessId();
+	char exepath[MAX_PATH];
+	ResolveModuleRelativePath(exepath, MAX_PATH, NULL, "updater.exe");
+	string cmdline(exepath);
+	cmdline += " ";
+	char buf[256];
+	_itoa_s(pid, buf, 10);
+	cmdline += buf;
+
+	PROCESS_INFORMATION pi;
+	STARTUPINFO si;
+	memset (&si, 0, sizeof si);
+	si.cb = sizeof si;
+	if (!CreateProcess (0, (LPSTR)cmdline.c_str(), 0, 0, 0, CREATE_NEW_PROCESS_GROUP, 0, 0, &si, &pi))
+		return false;
+	CloseHandle (pi.hProcess);
+	CloseHandle (pi.hThread);
+
+	return true;
+}
+
+
 int PASCAL
 WinMain (HINSTANCE hinst, HINSTANCE, LPSTR, int cmdshow)
 {
+  if (ExistsNewFolder())
+  {
+	  if(LaunchUpdater())
+		  return 0;
+	  MessageBox(NULL, "Fail to launch updater", "Error", MB_ICONERROR);
+	  return 1;
+  }
+
   int ole_initialized = 0;
   if (init_root_app (hinst, cmdshow, ole_initialized))
     {

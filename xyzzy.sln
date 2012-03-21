@@ -6,6 +6,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xyzzy", "src\xyzzy.vcxproj"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gen_syms", "src\gen_syms.vcxproj", "{CF3A9627-51CE-45C6-A8CE-9A90D2764282}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "updater", "updater\updater.vcxproj", "{2347D3DC-1731-4C3E-A535-7BA2F4942624}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -23,6 +25,10 @@ Global
 		{CF3A9627-51CE-45C6-A8CE-9A90D2764282}.Debug|Win32.Build.0 = Debug|Win32
 		{CF3A9627-51CE-45C6-A8CE-9A90D2764282}.Release|Win32.ActiveCfg = Release|Win32
 		{CF3A9627-51CE-45C6-A8CE-9A90D2764282}.Release|Win32.Build.0 = Release|Win32
+		{2347D3DC-1731-4C3E-A535-7BA2F4942624}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2347D3DC-1731-4C3E-A535-7BA2F4942624}.Debug|Win32.Build.0 = Debug|Win32
+		{2347D3DC-1731-4C3E-A535-7BA2F4942624}.Release|Win32.ActiveCfg = Release|Win32
+		{2347D3DC-1731-4C3E-A535-7BA2F4942624}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

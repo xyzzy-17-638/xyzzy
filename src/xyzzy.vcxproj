@@ -225,6 +225,7 @@
     <ClCompile Include="toplev.cc" />
     <ClCompile Include="ucs2.cc" />
     <ClCompile Include="undo.cc" />
+    <ClCompile Include="unzip.cc" />
     <ClCompile Include="usertab.cc" />
     <ClCompile Include="usertool.cc" />
     <ClCompile Include="utils.cc" />
@@ -358,6 +359,7 @@
     <ClInclude Include="timer.h" />
     <ClInclude Include="trace.h" />
     <ClInclude Include="ucs2tab.h" />
+    <ClInclude Include="unzip.h" />
     <ClInclude Include="utf2sjis.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="utimer.h" />
