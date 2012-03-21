@@ -3,9 +3,8 @@
 (provide "ni/update-xyzzy")
 (in-package "netinst")
 
-;  "https://raw.github.com/mumurik/xyzzy/master/latest-xyzzy-info.l"
 (defvar *latest-xyzzy-info-url*
-  "https://raw.github.com/mumurik/xyzzy/ni-integrate/latest-xyzzy-info.l"
+  "https://raw.github.com/mumurik/xyzzy/master/latest-xyzzy-info.l"
   "最新版のxyzzyの配布の情報の入ったファイルへのURL。packages.lと同じフォーマットを想定。")
 
 (defvar *installed-xyzzy-info-file*

@@ -120,5 +120,8 @@ http://blog.2310.net/archives/618
 http://www.jsdlab.co.jp/~kamei/
 
 
+## 配布ライセンス ##
+lisp/ni下だけは修正BSDライセンスとなってます。詳細はlisp/ni/LICENSE.txtを参照してください。
+それ以外はLICENSEファイルに従います。
 
 
