@@ -932,7 +932,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
 ;;; - 戻り値も readable に印字できないものはアウト
 ;;; - レキシカル変数を持ち込めない...
 
-(defun with-another-xyzzy--make-command-string (body options result-filename)
+(defun eval-in-another-xyzzy--make-command-string (body options result-filename)
   (let ((out (gensym "tmpfile-stream-")))
     (format nil "~A ~A -e ~S"
             (merge-pathnames "xyzzy.exe" (si:system-root))
@@ -950,7 +950,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
                         (format ,out ":error~%~S" error))))
                   (kill-xyzzy)))))))
 
-(defun with-another-xyzzy--read-results (result-filename)
+(defun eval-in-another-xyzzy--read-results (result-filename)
   (with-open-file (in result-filename
                    :direction :input)
     (case (read in nil '#1=#:eof)
@@ -964,7 +964,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
                    (error "unknown error~@[: ~S~]" error))))
       (#1#     (error "result not sent.")))))
 
-(defun with-another-xyzzy--delete-tmpbuf (tmpbuf time-limit)
+(defun eval-in-another-xyzzy--delete-tmpbuf (tmpbuf time-limit)
   (handler-case
       (delete-buffer tmpbuf)
     (error ()
@@ -985,7 +985,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
                          (t (again)))))
           (start-timer 6 #'delete-tmpbuf t))))))
 
-(defun with-another-xyzzy (body &key (options "") (timeout 60))
+(defun eval-in-another-xyzzy (body &key (options "") (timeout 60))
   (let* ((tmpfile (make-temp-file-name))
          (create-time (file-write-time tmpfile))
          (command-string
@@ -1002,7 +1002,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
             (sleep-for 0.1)
             (when (> (get-universal-time) (+ create-time timeout))
               (signal-process proc)
-              (error "with-another-xyzzy timeout.")))
+              (error "eval-in-another-xyzzy timeout.")))
           (with-another-xyzzy--read-results tmpfile))
       ;; FIXME: when another xyzzy doesn't close properly, it stays
       ;; in front so user can't see test progress.
