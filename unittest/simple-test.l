@@ -1009,7 +1009,6 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
       (activate-xyzzy-window (si:*instance-number))
       (eval-in-another-xyzzy--delete-tmpbuf tmpbuf (+ create-time 180000))
       (delete-file tmpfile))))
-(setf (get 'with-another-xyzzy 'ed:lisp-indent-hook) 0)
 
 #+unittest-meta-test
 (progn
