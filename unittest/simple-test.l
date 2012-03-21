@@ -995,7 +995,6 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
                    (setup-temp-buffer buffer)
                    buffer))
          (proc (make-process command-string :output tmpbuf)))
-    (setup-temp-buffer tmpbuf)
     (unwind-protect
         (progn
           ;; wait for finish.
