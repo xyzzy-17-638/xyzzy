@@ -989,7 +989,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
   (let* ((tmpfile (make-temp-file-name))
          (create-time (file-write-time tmpfile))
          (command-string
-           (with-another-xyzzy--make-command-string
+           (eval-in-another-xyzzy--make-command-string
             form options tmpfile))
          (tmpbuf (let ((buffer (create-new-buffer "*Temp*")))
                    (setup-temp-buffer buffer)
@@ -1003,11 +1003,11 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
             (when (> (get-universal-time) (+ create-time timeout))
               (signal-process proc)
               (error "eval-in-another-xyzzy timeout.")))
-          (with-another-xyzzy--read-results tmpfile))
+          (eval-in-another-xyzzy--read-results tmpfile))
       ;; FIXME: when another xyzzy doesn't close properly, it stays
       ;; in front so user can't see test progress.
       (activate-xyzzy-window (si:*instance-number))
-      (with-another-xyzzy--delete-tmpbuf tmpbuf (+ create-time 180000))
+      (eval-in-another-xyzzy--delete-tmpbuf tmpbuf (+ create-time 180000))
       (delete-file tmpfile))))
 (setf (get 'with-another-xyzzy 'ed:lisp-indent-hook) 0)
 
