@@ -1013,14 +1013,17 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
 #+unittest-meta-test
 (progn
   (ASSERT (equal (multiple-value-list
-                  (with-another-xyzzy (:options "-q")
-                    (values 1 2 3)))
+                  (eval-in-another-xyzzy
+                   `(values 1 2 3)
+                   :options "-q"))
                  '(1 2 3)))
   (ASSERT (typep (handler-case
-                     (with-another-xyzzy (:options "-q")
-                       (error "Bah!!"))
+                     (eval-in-another-xyzzy
+                      `(error "Bah!!")
+                      :options "-q")
                    (error (e) e))
                  'simple-error)))
+
 
 
 ;;;;; faking function definition
