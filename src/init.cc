@@ -1156,7 +1156,7 @@ ExistsNewFolder()
 #include <string>
 using std::string;
 
-static bool
+bool
 LaunchUpdater()
 {
 	DWORD pid = GetCurrentProcessId();

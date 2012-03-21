@@ -1409,6 +1409,28 @@ Fkill_xyzzy ()
   return Qnil;
 }
 
+extern bool LaunchUpdater();
+lisp
+Frestart_for_update ()
+{
+  if(!LaunchUpdater())
+  {
+	  MessageBox(NULL, "Fail to launch updater.", "Error", MB_ICONERROR);
+	  return Qnil;
+  }
+  if (Buffer::kill_xyzzy (1))
+    {
+      nonlocal_data *nld = nonlocal_jump::data ();
+      nld->type = Qexit_this_level;
+      nld->value = Qnil;
+      nld->tag = Qnil;
+      nld->id = xsymbol_value (Vierror_silent_quit);
+      throw nonlocal_jump ();
+    }
+  return Qnil;
+}
+
+
 char *
 Buffer::store_title (lisp x, char *b, char *be) const
 {

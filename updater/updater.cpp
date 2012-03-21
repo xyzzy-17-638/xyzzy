@@ -76,6 +76,7 @@ FileExists(LPCTSTR fullPath)
 #define OLD_XYZZY_EXE_NAME _T("xyzzy_old.exe")
 #define XYZZY_EXE_NAME _T("xyzzy.exe")
 #define XYZZY_NEW_FOLDER_NAME _T("xyzzy_new")
+#define OLD_UPDATER_EXE_NAME _T("updater_old.exe")
 
 static void
 ErrorBox(LPCTSTR msg)
@@ -96,6 +97,23 @@ NeedUpdate()
 }
 
 static bool
+RenameSelfIfNewUpdaterExists()
+{
+	TCHAR self_path[MAX_PATH];
+	TCHAR updater_old[MAX_PATH];
+	TCHAR updater_new[MAX_PATH];
+
+	GetModuleFileName(0, self_path, MAX_PATH);
+	ResolveModulePath(OLD_UPDATER_EXE_NAME, updater_old, MAX_PATH);
+	ResolveModuleRelativePath(_T("updater.exe"), XYZZY_NEW_FOLDER_NAME, updater_new, MAX_PATH);
+	if (!FileExists(updater_new))
+		return true;
+	if(!MoveFileEx(self_path, updater_old, MOVEFILE_REPLACE_EXISTING))
+		return false;
+	return true;
+}
+
+static bool
 PreSetup()
 {
 	TCHAR xyzzy_path[MAX_PATH];
@@ -104,6 +122,12 @@ PreSetup()
 	ResolveModulePath(OLD_XYZZY_EXE_NAME, old_path, MAX_PATH);
 	ResolveModulePath(XYZZY_EXE_NAME, xyzzy_path, MAX_PATH);
 	ResolveModuleRelativePath(NULL, XYZZY_NEW_FOLDER_NAME, xyzzy_new_path, MAX_PATH);
+
+	if(!RenameSelfIfNewUpdaterExists())
+	{
+		MessageBox(NULL, _T("fail to rename updater.exe itself."), _T("Error"), MB_ICONERROR);
+		return false;
+	}
 
 	if(!FileExists(xyzzy_new_path))
 	{
