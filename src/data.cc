@@ -2795,14 +2795,7 @@ rdump_xyzzy (FILE *fp)
   return 1;
 }
 
-static int dump_flag;
-
-void
-set_undumped()
-{
-	dump_flag = 0;
-}
-
+static int dump_flag = 0;
 
 int
 rdump_xyzzy ()

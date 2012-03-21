@@ -731,10 +731,6 @@ init_lisp_objects ()
           init_symbol_value_once ();
           init_condition ();
         }
-	  if(redump)
-	  {
-		  set_undumped();
-	  }
       init_symbol_value ();
       init_syntax_spec ();
       init_env_symbols (config_path, ini_file);
