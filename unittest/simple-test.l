@@ -932,7 +932,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
 ;;; - 戻り値も readable に印字できないものはアウト
 ;;; - レキシカル変数を持ち込めない...
 
-(defun eval-in-another-xyzzy--make-command-string (body options result-filename)
+(defun eval-in-another-xyzzy--make-command-string (form options result-filename)
   (let ((out (gensym "tmpfile-stream-")))
     (format nil "~A ~A -e ~S"
             (merge-pathnames "xyzzy.exe" (si:system-root))
@@ -944,7 +944,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
                                    :direction :output
                                    :if-does-not-exist :create)
                     (handler-case
-                        (let ((values (multiple-value-list (progn ,body))))
+                        (let ((values (multiple-value-list (progn ,form))))
                           (format ,out ":return~%~{~S~%~}" values))
                       (error (error)
                         (format ,out ":error~%~S" error))))
