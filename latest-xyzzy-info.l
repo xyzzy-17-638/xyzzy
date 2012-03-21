@@ -2,4 +2,4 @@
 ("author" . "mumurik765")
 ("url" . "https://raw.github.com/mumurik/xyzzy/tree/ni-integrate/latest-xyzzy-info.l")
 ("description" . "Xyzzyのマルチフレーム版配布サイトです。")
-("packages" (("name" . "xyzzy") ("version" . "0.2.3.5") ("author" . "mumurik765") ("file" . "updatetest2.zip") ("src" . "http://cdn.bitbucket.org/mumurik/xyzzy/downloads/updatetest2.zip") ("description" . "updaterテスト用の次のバージョン。") ("category") ("md5" . "e90cb7ed9e0efc0ed4e37f29f909c3cc") ("time" . 3541297525) ("depends") ("changes" . "updaterテスト用2。") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))
+("packages" (("name" . "xyzzy") ("version" . "0.2.3.5") ("author" . "mumurik765") ("file" . "updatetest3.zip") ("src" . "http://cdn.bitbucket.org/mumurik/xyzzy/downloads/updatetest3.zip") ("description" . "updaterテスト用の第三バージョン。") ("category") ("md5" . "57ea896cf0f9edf5036432ff91f5fb7f") ("time" . 3541298988) ("depends") ("changes" . "updaterテスト用3。") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))
