@@ -225,7 +225,7 @@
     <ClCompile Include="toplev.cc" />
     <ClCompile Include="ucs2.cc" />
     <ClCompile Include="undo.cc" />
-    <ClCompile Include="unzip.cpp" />
+    <ClCompile Include="unzip.cc" />
     <ClCompile Include="usertab.cc" />
     <ClCompile Include="usertool.cc" />
     <ClCompile Include="utils.cc" />

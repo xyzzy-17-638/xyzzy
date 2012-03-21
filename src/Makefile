@@ -111,6 +111,7 @@ thread.cc \
 toplev.cc \
 ucs2.cc \
 undo.cc \
+unzip.cc \
 usertab.cc \
 usertool.cc \
 utils.cc \

@@ -377,7 +377,7 @@
     <ClCompile Include="..\privctrl\url.cc">
       <Filter>source</Filter>
     </ClCompile>
-    <ClCompile Include="unzip.cpp">
+    <ClCompile Include="unzip.cc">
       <Filter>source</Filter>
     </ClCompile>
   </ItemGroup>
