@@ -8,7 +8,7 @@
 # define PROGRAM_MINOR_VERSION 2
 # define PROGRAM_MAJOR_REVISION 3
 # define PROGRAM_MINOR_REVISION 5
-# define PROGRAM_PATCH_LEVEL 2
+# define PROGRAM_PATCH_LEVEL 3
 
 # define TITLE_BAR_STRING_SIZE 256
 extern char TitleBarString[];
