@@ -944,7 +944,7 @@ Delete temp buffer automatically. If you don't want to delete, set *test-temp-bu
                                    :direction :output
                                    :if-does-not-exist :create)
                     (handler-case
-                        (let ((values (multiple-value-list (progn ,form))))
+                        (let ((values (multiple-value-list ,form)))
                           (format ,out ":return~%~{~S~%~}" values))
                       (error (error)
                         (format ,out ":error~%~S" error))))
