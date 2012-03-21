@@ -817,7 +817,7 @@ environ::load_geometry (int cmdshow, POINT *point, SIZE *size)
   scr.cy = GetSystemMetrics (SM_CYSCREEN);
 
   char name[64];
-  sprintf (name, "%dx%d", scr.cx, scr.cy);
+  make_geometry_key (name, sizeof name, 0);
   WINDOWPLACEMENT w;
   if (read_conf (cfgMisc, name, w)
       && w.rcNormalPosition.left < w.rcNormalPosition.right
@@ -867,8 +867,7 @@ environ::save_geometry ()
       if (GetWindowPlacement (active_app_frame().toplev, &w))
         {
           char name[256];
-          sprintf (name, "%dx%d",
-                   GetSystemMetrics (SM_CXSCREEN), GetSystemMetrics (SM_CYSCREEN));
+          make_geometry_key (name, sizeof name, 0);
           if (!save_window_size || !save_window_position)
             {
               WINDOWPLACEMENT ow;
