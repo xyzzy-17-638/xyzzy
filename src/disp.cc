@@ -3351,35 +3351,35 @@ mode_line_point_painter::paint_point (HDC hdc)
 
   RECT r;
   r.top = 1;
-  r.bottom = m_ml_size.cy - 1;
+  r.bottom = w_ml_size.cy - 1;
 
   char nb[32];
-  format_point (nb, m_plinenum, m_column);
+  format_point (nb, w_plinenum, w_column);
   const char *b, *e;
   point_from_end (nb, b, e);
-  m_last_ml_point_width = e - b;
+  w_last_ml_point_width = e - b;
 
-  int x0 = (m_point_pixel + m_modeline_paramp->m_exts[1]
-            - m_modeline_paramp->m_exts[b - nb]);
-  int right = (x0 + m_modeline_paramp->m_exts[e - nb]
-               + m_modeline_paramp->m_exts[1]);
+  int x0 = (w_point_pixel + app.modeline_param.m_exts[1]
+            - app.modeline_param.m_exts[b - nb]);
+  int right = (x0 + app.modeline_param.m_exts[e - nb]
+               + app.modeline_param.m_exts[1]);
 
-  if (m_last_ml_linenum < 0)
+  if (w_last_ml_linenum < 0)
     {
-      r.left = m_point_pixel;
-      r.right = min (right, int (m_ml_size.cx - 1));
+      r.left = w_point_pixel;
+      r.right = min (right, int (w_ml_size.cx - 1));
     }
   else
     {
       char ob[32];
-      format_point (ob, m_last_ml_linenum, m_last_ml_column);
+      format_point (ob, w_last_ml_linenum, w_last_ml_column);
       int ib = b - nb, ie = e - nb;
       for (; ib < ie && ob[ib] == nb[ib]; ib++)
         ;
       for (; ie > ib && ob[ie - 1] == nb[ie - 1]; ie--)
         ;
-      r.left = x0 + m_modeline_paramp->m_exts[ib];
-      r.right = min (x0 + m_modeline_paramp->m_exts[ie], int (m_ml_size.cx - 1));
+      r.left = x0 + app.modeline_param.m_exts[ib];
+      r.right = min (x0 + app.modeline_param.m_exts[ie], int (w_ml_size.cx - 1));
       b = nb + ib;
       e = nb + ie;
     }
@@ -3390,21 +3390,19 @@ mode_line_point_painter::paint_point (HDC hdc)
     ;
 
   ExtTextOut (hdc,
-              x0 + m_modeline_paramp->m_exts[b - nb],
-              1 + m_modeline_paramp->m_exlead,
+              x0 + app.modeline_param.m_exts[b - nb],
+              1 + app.modeline_param.m_exlead,
               ETO_OPAQUE | ETO_CLIPPED, &r, b, e - b, 0);
-  m_last_ml_column = m_column;
-  m_last_ml_linenum = m_plinenum;
+  w_last_ml_column = w_column;
+  w_last_ml_linenum = w_plinenum;
   return right;
 }
-
 
 void
 Window::paint_mode_line (HDC hdc)
 {
   char *b0, *b;
   char *posp = 0;
-  char *percentp = 0;
 
   w_ime_mode_line = 0;
   lisp fmt = symbol_value (Vmode_line_format, w_bufp);
@@ -3415,7 +3413,7 @@ Window::paint_mode_line (HDC hdc)
       b = b0;
       *b++ = ' ';
 
-      buffer_info binfo (this, w_bufp, &posp, &w_ime_mode_line, &percentp);
+      buffer_info binfo (this, w_bufp, &posp, &w_ime_mode_line);
       b = binfo.format (fmt, b, b0 + l);
     }
   else
@@ -3512,8 +3510,6 @@ Window::paint_mode_line (HDC hdc)
       ExtTextOut (hdc, r.left, 1 + w_owner->modeline_param.m_exlead,
                   ETO_OPAQUE | ETO_CLIPPED, &r, b1, b - b1, 0);
     }
-
-
 
   SelectObject (hdc, of);
   SetTextColor (hdc, ofg);
