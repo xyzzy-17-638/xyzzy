@@ -2,4 +2,4 @@
 ("author" . "mumurik765")
 ("url" . "https://raw.github.com/mumurik/xyzzy/tree/ni-integrate/latest-xyzzy-info.l")
 ("description" . "Xyzzyのマルチフレーム版配布サイトです。")
-("packages" (("name" . "xyzzy") ("version" . "0.2.3.5.3") ("author" . "mumurik765") ("file" . "multiframe_0_2_3_6_alpha5.zip") ("src" . "http://cdn.bitbucket.org/mumurik/xyzzy/downloads/multiframe_0_2_3_6_alpha5.zip") ("description" . "updaterテスト用の第7バージョン。") ("category") ("md5" . "480fe06ff04a72cb6cabef33cabafe3f") ("time" . 3541323984) ("depends") ("changes" . "updaterテスト用7。") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))
+("packages" (("name" . "xyzzy") ("version" . "0.2.3.5.4") ("author" . "mumurik765") ("file" . "multiframe_0_2_3_6_alpha7.zip") ("src" . "http://cdn.bitbucket.org/mumurik/xyzzy/downloads/multiframe_0_2_3_6_alpha7.zip") ("description" . "updaterテスト用の第8バージョン。") ("category") ("md5" . "d60abe0d1c64119507d3705a4b2dcaf0") ("time" . 3541387753) ("depends") ("changes" . "updaterテスト用8。") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))
