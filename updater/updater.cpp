@@ -164,11 +164,33 @@ PreSetup()
 using std::vector;
 using std::map;
 typedef std::basic_string<TCHAR> tstring;
+using std::string;
+
+class FileFinder
+{
+public:
+	FileFinder(LPCTSTR path)
+	{
+		hFind = FindFirstFile(path, &fd);
+	}
+	const bool Fail() { return INVALID_HANDLE_VALUE == hFind; }
+	bool Next()
+	{
+		return FALSE != FindNextFile(hFind, &fd) ;
+	}
+	~FileFinder() {
+		if(!Fail())
+			FindClose(hFind);
+	}
+	WIN32_FIND_DATA fd;
+	HANDLE hFind;
+};
+
 
 template<class T> class FileMover
 {
 public:
-	FileMover(LPCTSTR in_src_root, LPCTSTR in_dest_root, T in_listener) : src_root(in_src_root), dest_root (in_dest_root), listener(in_listener)
+	FileMover(LPCTSTR in_src_root, LPCTSTR in_dest_root, T& in_listener) : src_root(in_src_root), dest_root (in_dest_root), listener(in_listener)
 	{
 		dir_skip_list[_T("etc\\")] = true;
 	}
@@ -212,29 +234,30 @@ public:
 		vector<tstring> files;
 		vector<tstring> dirs;
 
-		WIN32_FIND_DATA fd;
 		ResolveRelativePath(src, NULL, _T("*"), src_pat, MAX_PATH);
-		HANDLE hFind = FindFirstFile(src_pat, &fd);
-		if( INVALID_HANDLE_VALUE == hFind )
+
 		{
-			throw std::exception("no src folder.");
+			FileFinder finder(src_pat);
+			if( finder.Fail() )
+			{
+				throw std::exception("no src folder.");
+			}
+			do
+			{
+				WIN32_FIND_DATA& fd(finder.fd);
+				if(_T('.') == fd.cFileName[0])
+					continue;
+				if( FILE_ATTRIBUTE_DIRECTORY & fd.dwFileAttributes )
+				{
+					dirs.push_back(fd.cFileName);
+				}
+				else
+				{
+					files.push_back(fd.cFileName);
+				}
+
+			}while( finder.Next());
 		}
-
-		do
-		{
-			if(_T('.') == fd.cFileName[0])
-				continue;
-			if( FILE_ATTRIBUTE_DIRECTORY & fd.dwFileAttributes )
-			{
-				dirs.push_back(fd.cFileName);
-			}
-			else
-			{
-				files.push_back(fd.cFileName);
-			}
-
-		}while( FindNextFile(hFind, &fd));
-		FindClose(hFind);
 		MoveFiles(src, dest, files);
 
 		for(vector<tstring>::iterator itr = dirs.begin(); itr != dirs.end(); itr++)
@@ -247,24 +270,64 @@ public:
 			Move(path_with_delim.c_str());
 		}
 	}
+	void ThrowException(LPCSTR in_msg, LPCTSTR path)
+	{
+			char cpath[MAX_PATH];
+			wcstombs_s(NULL, cpath, path,  _TRUNCATE);
+			string msg(in_msg);
+			msg += cpath;
+			throw std::exception(msg.c_str());
+	}
+	void DeleteFileWithException(LPCTSTR path)
+	{
+		if(!DeleteFile(path))
+		{
+			ThrowException("fail to delete: ", path);
+		}
+	}
 	void DeleteFolder(LPCTSTR inputPath)
 	{
-		TCHAR path[MAX_PATH+1];
-		_tcscpy_s(path, MAX_PATH, inputPath);
-		int len = _tcslen(path);
-		if(len > MAX_PATH-1)
-			throw std::exception("too long delete folder path");
-		path[len+1] = _T('\0');
+		vector<tstring> dirs;
 
-		SHFILEOPSTRUCT ss;
-		ZeroMemory(&ss, sizeof(SHFILEOPSTRUCT));
-		ss.hwnd = NULL;
-		ss.wFunc = FO_DELETE;
-		ss.fFlags = FOF_NOCONFIRMATION;
-		ss.pFrom = path;
-		int ret = SHFileOperation(&ss);
-		if(ret != 0)
-			throw std::exception("Shell file operation fail");
+		{
+			tstring all_children(inputPath);
+			all_children += _T("*");
+			FileFinder finder(all_children.c_str());
+			if( finder.Fail() )
+			{
+				throw std::exception("no src folder 2.");
+			}
+			WIN32_FIND_DATA& fd(finder.fd);
+			do
+			{
+				if(  _tcscmp(_T("."), fd.cFileName) == 0
+					|| _tcscmp(_T(".."), fd.cFileName) == 0)
+					continue;
+				if( FILE_ATTRIBUTE_DIRECTORY & fd.dwFileAttributes )
+				{
+					dirs.push_back(fd.cFileName);
+				}
+				else
+				{
+					tstring delPath(inputPath);
+					delPath += fd.cFileName;
+					DeleteFileWithException(delPath.c_str());
+				}
+
+			}while( finder.Next() );
+		}
+		for(vector<tstring>::iterator itr = dirs.begin(); itr != dirs.end(); itr++)
+		{
+			tstring path_with_delim(inputPath);
+			path_with_delim += *itr;
+			path_with_delim.push_back(_T('\\'));
+			DeleteFolder(path_with_delim.c_str());
+		}
+		if(!RemoveDirectory(inputPath))
+		{
+			ThrowException("fail to delte folder: ", inputPath);
+		}
+
 	}
 	bool MoveAll()
 	{
@@ -330,6 +393,9 @@ WaitParentFinish(DWORD pid)
 {
 	DWORD exitCode;
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
+	if(hProcess == NULL)
+		return true;
+
 	int retryNum = 0;
 	while(!GetExitCodeProcess(hProcess, &exitCode) ||
 		exitCode == STILL_ACTIVE)
@@ -398,7 +464,6 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 		ErrorBox(_T("invalid arguments."));
 		return 0;
 	}
-
 
 	if(!NeedUpdate())
 	{
@@ -509,8 +574,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 class Listener
 {
 public:
-	Listener(HWND in_hwnd) : hwnd(in_hwnd)
+	Listener(HWND in_hwnd)
 	{
+		hwnd = in_hwnd;
 	}
 	void Notify(LPCTSTR msg)
 	{
@@ -563,13 +629,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_CREATE:
+#ifdef _DEBUG
+ErrorBox(_T("wait debugger"));
+#endif
 		_tcscpy_s(buf, _T("update start..."));
 		hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE) UpdateWoker, (LPVOID)hWnd, 0, &tid);
 		return DefWindowProc(hWnd, message, wParam, lParam);
 		break;
 	case WM_UPDATE_DONE:
 		if(wParam)
+		{
 			StartXyzzy();
+		}
+		else
+		{
+			tstring tmsg(_T("Move All fail. last notify: "));
+			tmsg += buf;
+			ErrorBox(tmsg.c_str());
+		}
 		PostQuitMessage(1);
 		break;
 	case WM_UPDATE_PROGESS:
