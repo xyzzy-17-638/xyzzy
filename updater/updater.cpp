@@ -280,7 +280,7 @@ public:
 		{
 			WCHAR msg[256];	
 			mbstowcs_s(NULL, msg, 256, e.what(), strlen(e.what()));
-			ErrorBox(msg);
+			listener.Notify(msg);
 			return false;
 		}
 	}
