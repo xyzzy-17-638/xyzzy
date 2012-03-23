@@ -40,10 +40,15 @@ srcが入っている事は保障されない。"
 "urlの内容をfileにバイナリで保存。fileはフルパス
 一旦メモリに全て読み込むので大きなファイルでは使わないでください。"
   (unless *xhr*
-    (setq *xhr* (ole-create-object "MSXML2.XMLHTTP")))
+    (setq *xhr* (ole-create-object "WinHttp.WinHttpRequest.5.1")))
   (long-operation
     (ole-method *xhr* 'open "GET" url nil) ;; non-blocking and just sleep never change state. so use as blocking.
+    (ole-putprop *xhr* 'Option t 6) ; redirect
     (ole-method *xhr* 'send)
+    (if (eq (ole-method *xhr* 'status) 302) ; handle redirect only once because it's enough for most of the case.
+	(progn
+	  (ole-method *xhr* 'open "GET" (ole-method *xhr* 'GetResponseHeader "location") nil)
+	  (ole-method *xhr* 'send)))
     (if (not (eq (ole-method *xhr* 'status) 200))
 	(progn
 	  (message-box "アーカイブの取得に失敗しました")
