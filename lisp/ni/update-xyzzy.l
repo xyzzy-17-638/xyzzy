@@ -44,10 +44,12 @@ srcÇ™ì¸Ç¡ÇƒÇ¢ÇÈéñÇÕï€è·Ç≥ÇÍÇ»Ç¢ÅB"
   (long-operation
     (ole-method *xhr* 'open "GET" url nil) ;; non-blocking and just sleep never change state. so use as blocking.
     (ole-putprop *xhr* 'Option t 6) ; redirect
+    (ole-method *xhr* 'setRequestHeader "If-Modified-Since" "Thu, 01 Jun 1970 00:00:00 GMT") ; to invalidate cash
     (ole-method *xhr* 'send)
     (if (eq (ole-method *xhr* 'status) 302) ; handle redirect only once because it's enough for most of the case.
 	(progn
 	  (ole-method *xhr* 'open "GET" (ole-method *xhr* 'GetResponseHeader "location") nil)
+	  (ole-method *xhr* 'setRequestHeader "If-Modified-Since" "Thu, 01 Jun 1970 00:00:00 GMT") ; to invalidate cash
 	  (ole-method *xhr* 'send)))
     (if (not (eq (ole-method *xhr* 'status) 200))
 	(progn
