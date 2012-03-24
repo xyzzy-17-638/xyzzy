@@ -1282,6 +1282,7 @@
 (si::defun-builtin ole-enumerator-reset (oleobj))
 (si::defun-builtin ole-enumerator-skip (oleobj &optional count))
 (si::defun-builtin wow64-reinterpret-path (string flag))
+(si::defun-builtin create-uuid (&key :sequential))
 
 (gc)
 
