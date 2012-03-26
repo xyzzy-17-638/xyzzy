@@ -88,12 +88,14 @@ charclass::count_size (cc &f) const
   for (int h = 0; h < 256; h++)
     if (isset (hi, h))
       {
-	    int l, u, i;
+        int l;
         for (l = 0; l < 256 / NBITS && !lo[h][l]; l++)
           ;
+        int u;
         for (u = 256 / NBITS - 1; u > l && !lo[h][u]; u--)
           ;
         u++;
+        int i;
         for (i = l; i < u; i++)
           if (lo[h][i] != Char (-1))
             break;
@@ -268,8 +270,8 @@ regexp_compile::dump (const Char *p0, int size)
         case NORMAL_CHARS:
           {
             printf ("normal-chars: ");
-			int i = 1;
-            for (; i <= *p; i++)
+            int i;
+            for (i = 1; i <= *p; i++)
               putchar (p[i]);
             p += i;
           }

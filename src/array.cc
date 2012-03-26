@@ -610,7 +610,7 @@ adjust_replace_array (lisp array1, lisp array2)
   if (xarray_displaced_to (array1) != Qnil
       && base_array_p (xarray_displaced_to (array1)))
     {
-	  lisp x;
+      lisp x;
       for (x = xarray_referenced_list (xarray_displaced_to (array1));
            consp (x); x = xcdr (x))
         if (xcar (x) == array2)
