@@ -38,19 +38,17 @@ srcが入っている事は保障されない。"
 
 (defun https-get-to-file (url file)
 "urlの内容をfileにバイナリで保存。fileはフルパス
-一旦メモリに全て読み込むので大きなファイルでは使わないでください。"
+一旦メモリに全て読み込むので大きなファイルでは使わないでください。
+httpsからhttpへのredirectを許容しています。
+これはniの場合はhashを比較するので比較的安全ですが、それ以外の用途に使う場合は注意。"
   (unless *xhr*
     (setq *xhr* (ole-create-object "WinHttp.WinHttpRequest.5.1")))
   (long-operation
     (ole-method *xhr* 'open "GET" url nil) ;; non-blocking and just sleep never change state. so use as blocking.
-    (ole-putprop *xhr* 'Option t 6) ; redirect
+    (ole-putprop *xhr* 'Option t 6) ; enable redirect 6
+    (ole-putprop *xhr* 'Option t 12) ;EnableHttpsToHttpRedirects 12
     (ole-method *xhr* 'setRequestHeader "If-Modified-Since" "Thu, 01 Jun 1970 00:00:00 GMT") ; to invalidate cash
     (ole-method *xhr* 'send)
-    (if (eq (ole-method *xhr* 'status) 302) ; handle redirect only once because it's enough for most of the case.
-	(progn
-	  (ole-method *xhr* 'open "GET" (ole-method *xhr* 'GetResponseHeader "location") nil)
-	  (ole-method *xhr* 'setRequestHeader "If-Modified-Since" "Thu, 01 Jun 1970 00:00:00 GMT") ; to invalidate cash
-	  (ole-method *xhr* 'send)))
     (if (not (eq (ole-method *xhr* 'status) 200))
 	(progn
 	  (message-box "アーカイブの取得に失敗しました")
