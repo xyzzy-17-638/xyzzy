@@ -470,27 +470,12 @@ getUtf16Code (int sjis, wchar_t* out)
       else
         {
 			int o = 0;
-			switch(sjis) {
-			default:	break;
-			case 0x82f2:	o = 0x3094;	break;	// HIRAGANA LETTER VU	[2000]	「う」＋「゛」
-			case 0x82f3:	o = 0x3095;	break;	// HIRAGANA LETTER SMALL KA	[2000]	[Unicode3.2]	ひらがなの小さい「か」
-			case 0x82f4:	o = 0x3096;	break;	// HIRAGANA LETTER SMALL KE	[2000]	[Unicode3.2]	ひらがなの小さい「け」
-			case 0x83EC:	o = 0x31F0;	break;	//	# KATAKANA LETTER SMALL KU	[2000]	[Unicode3.2]
-			case 0x83ED:	o = 0x31F1;	break;	//	# KATAKANA LETTER SMALL SI	[2000]	[Unicode3.2]
-			case 0x83EE:	o = 0x31F2;	break;	//	# KATAKANA LETTER SMALL SU	[2000]	[Unicode3.2]
-			case 0x83EF:	o = 0x31F3;	break;	//	# KATAKANA LETTER SMALL TO	[2000]	[Unicode3.2]
-			case 0x83F0:	o = 0x31F4;	break;	//	# KATAKANA LETTER SMALL NU	[2000]	[Unicode3.2]
-			case 0x83F1:	o = 0x31F5;	break;	//	# KATAKANA LETTER SMALL HA	[2000]	[Unicode3.2]
-			case 0x83F2:	o = 0x31F6;	break;	//	# KATAKANA LETTER SMALL HI	[2000]	[Unicode3.2]
-			case 0x83F3:	o = 0x31F7;	break;	//	# KATAKANA LETTER SMALL HU	[2000]	[Unicode3.2]
-			case 0x83F4:	o = 0x31F8;	break;	//	# KATAKANA LETTER SMALL HE	[2000]	[Unicode3.2]
-			case 0x83F5:	o = 0x31F9;	break;	//	# KATAKANA LETTER SMALL HO	[2000]	[Unicode3.2]
-			case 0x83F7:	o = 0x31FA;	break;	//	# KATAKANA LETTER SMALL MU	[2000]	[Unicode3.2]
-			case 0x83F8:	o = 0x31FB;	break;	//	# KATAKANA LETTER SMALL RA	[2000]	[Unicode3.2]
-			case 0x83F9:	o = 0x31FC;	break;	//	# KATAKANA LETTER SMALL RI	[2000]	[Unicode3.2]
-			case 0x83FA:	o = 0x31FD;	break;	//	# KATAKANA LETTER SMALL RU	[2000]	[Unicode3.2]
-			case 0x83FB:	o = 0x31FE;	break;	//	# KATAKANA LETTER SMALL RE	[2000]	[Unicode3.2]
-			case 0x83FC:	o = 0x31FF;	break;	//	# KATAKANA LETTER SMALL RO	[2000]	[Unicode3.2]
+#include "unicode-3.1-sjis.h"
+			for(size_t i = 0; i < sizeof(unicode32Sjis)/sizeof(unicode32Sjis[0]); ++i) {
+				const Unicode32Sjis& e = unicode32Sjis[i];
+				if(sjis == e.sjis) {
+					o = (unsigned short) e.ucs4;
+				}
 			}
 			if(o) {
 				*out = o;

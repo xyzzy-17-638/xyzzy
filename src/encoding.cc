@@ -1117,6 +1117,17 @@ internal_to_sjis_stream::refill ()
           if (code_charset_bit (cc) & ccsf_possible_cp932)
             {
               cc = wc2cp932 (i2w (cc));
+				if(cc == Char(-1)) {
+					#include "unicode-3.1-sjis.h"
+					ucs2_t wc = i2w(c);
+					for(size_t i = 0; i < sizeof(unicode32Sjis)/sizeof(unicode32Sjis[0]); ++i) {
+						const Unicode32Sjis& e = unicode32Sjis[i];
+						if(e.ucs4 == wc) {
+							cc = e.sjis;
+							break;
+						}
+					}
+				}
               if (cc == Char (-1))
                 cc = DEFCHAR;
             }
@@ -1657,6 +1668,22 @@ internal_to_utf_stream::getw () const
           s_in.putback (c2);
         }
     }
+
+	{
+#include "unicode-3.1-sjis.h"
+		wc = 0;
+		for(size_t i = 0; i < sizeof(unicode32Sjis)/sizeof(unicode32Sjis[0]); ++i) {
+			const Unicode32Sjis& e = unicode32Sjis[i];
+			if(cc == e.sjis) {
+				wc = (unsigned short) e.ucs4;
+				break;
+			}
+		}
+		if(wc) {
+			return wc;
+		}
+	}
+
   return DEFCHAR;
 }
 
@@ -2100,6 +2127,7 @@ internal_to_windows_codepage_stream::refill ()
       if (cc >= 128)
         {
           cc = lookup_wc2int_hash (s_hash, i2w (cc));
+DebugOut("%s(%c) : c=%04x -> cc=%04x\n", __FUNCTION__, __LINE__, c, cc);
           if (cc == Char (-1))
             cc = DEFCHAR;
         }

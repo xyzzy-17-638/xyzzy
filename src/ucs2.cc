@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "ed.h"
 #include "cdecl.h"
 #include "charset.h"
 #include "ucs2tab.h"
@@ -574,25 +575,24 @@ init_ucs2_table ()
   init_wc2gb2312_table ();
 #endif
 	{
-		wc2internal_table[0x3094] = 0x82f2;	// HIRAGANA LETTER VU	[2000]	「う」＋「゛」
-		wc2internal_table[0x3095] = 0x82f3;	// HIRAGANA LETTER SMALL KA	[2000]	[Unicode3.2]	ひらがなの小さい「か」
-		wc2internal_table[0x3096] = 0x82f4;	// HIRAGANA LETTER SMALL KE	[2000]	[Unicode3.2]	ひらがなの小さい「け」
-		wc2internal_table[0x31F0] = 0x83EC;	//	# KATAKANA LETTER SMALL KU	[2000]	[Unicode3.2]
-		wc2internal_table[0x31F1] = 0x83ED;	//	# KATAKANA LETTER SMALL SI	[2000]	[Unicode3.2]
-		wc2internal_table[0x31F2] = 0x83EE;	//	# KATAKANA LETTER SMALL SU	[2000]	[Unicode3.2]
-		wc2internal_table[0x31F3] = 0x83EF;	//	# KATAKANA LETTER SMALL TO	[2000]	[Unicode3.2]
-		wc2internal_table[0x31F4] = 0x83F0;	//	# KATAKANA LETTER SMALL NU	[2000]	[Unicode3.2]
-		wc2internal_table[0x31F5] = 0x83F1;	//	# KATAKANA LETTER SMALL HA	[2000]	[Unicode3.2]
-		wc2internal_table[0x31F6] = 0x83F2;	//	# KATAKANA LETTER SMALL HI	[2000]	[Unicode3.2]
-		wc2internal_table[0x31F7] = 0x83F3;	//	# KATAKANA LETTER SMALL HU	[2000]	[Unicode3.2]
-		wc2internal_table[0x31F8] = 0x83F4;	//	# KATAKANA LETTER SMALL HE	[2000]	[Unicode3.2]
-		wc2internal_table[0x31F9] = 0x83F5;	//	# KATAKANA LETTER SMALL HO	[2000]	[Unicode3.2]
-		wc2internal_table[0x31FA] = 0x83F7;	//	# KATAKANA LETTER SMALL MU	[2000]	[Unicode3.2]
-		wc2internal_table[0x31FB] = 0x83F8;	//	# KATAKANA LETTER SMALL RA	[2000]	[Unicode3.2]
-		wc2internal_table[0x31FC] = 0x83F9;	//	# KATAKANA LETTER SMALL RI	[2000]	[Unicode3.2]
-		wc2internal_table[0x31FD] = 0x83FA;	//	# KATAKANA LETTER SMALL RU	[2000]	[Unicode3.2]
-		wc2internal_table[0x31FE] = 0x83FB;	//	# KATAKANA LETTER SMALL RE	[2000]	[Unicode3.2]
-		wc2internal_table[0x31FF] = 0x83FC;	//	# KATAKANA LETTER SMALL RO	[2000]	[Unicode3.2]
+#include "unicode-3.1-sjis.h"
+		for(size_t i = 0; i < sizeof(unicode32Sjis)/sizeof(unicode32Sjis[0]); ++i) {
+			const Unicode32Sjis& e = unicode32Sjis[i];
+			unsigned short sjis  = e.sjis;
+			unsigned short utf16 = (unsigned short) e.ucs4;
+			unsigned short oldInternal = wc2internal_table[utf16];
+			if(oldInternal != 0xffff) {
+				unsigned short oldUtf16 = internal2wc_table[oldInternal];
+				internal2wc_table[oldInternal] = 0xffff;
+				if(oldUtf16 != 0xffff) {
+					wc2internal_table[oldUtf16   ] = 0xffff;
+					wc2cp932_table   [oldUtf16   ] = 0xffff;
+				}
+			}
+			internal2wc_table	[sjis]	= utf16;
+			wc2internal_table	[utf16]	= sjis;
+			wc2cp932_table		[utf16]	= sjis;
+		}
 	}
 }
 

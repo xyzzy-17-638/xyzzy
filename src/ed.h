@@ -717,4 +717,14 @@ public:
 };
 
 
+struct DebugOut {
+  DebugOut(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    char buf[1024];
+    vsprintf(buf, fmt, args);
+    OutputDebugStringA(buf);
+    va_end(args);
+  }
+};
 #endif
