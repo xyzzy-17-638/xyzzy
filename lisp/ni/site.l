@@ -96,7 +96,7 @@
 (defun get-site-data (site &optional force)
   (let ((src (site-src site))
 	(file (site-data-file site)))
-    (http-get-to-file src file force)))
+      (http-get-to-file src file force)))
 
 (defun load-site-data-file (site)
   (let ((file (site-data-file site)))

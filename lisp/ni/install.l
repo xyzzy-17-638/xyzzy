@@ -237,7 +237,7 @@
     (log-output "going to fetch ~A" src)
     (when (app-src-md5sum-check app)
       (return-from install-app-fetch t))
-    (cond ((url-http-p src)
+    (cond ((or (url-http-p src) (url-https-p src))
 	   (http-get-to-file src file))
 	  ((url-local-p src)
 	   (unless (not (path-equal src file))

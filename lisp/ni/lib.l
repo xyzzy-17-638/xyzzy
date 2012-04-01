@@ -57,12 +57,17 @@
 (defun url-http-p (url)
   (string-match "^http://" url))
 
+(defun url-https-p (url)
+  (string-match "^https://" url))
+
 (defun url-local-p (url)
   (or (string-match "^[a-zA-Z]:/" url)
       (string-match "^//" url)))
 
 (defun url-to-filename (url)
   (cond ((url-http-p url)
+	 (si:www-url-encode url))
+	((url-https-p url)
 	 (si:www-url-encode url))
 	((url-local-p url)
 	 url)

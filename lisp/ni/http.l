@@ -325,6 +325,13 @@
 
 (defun http-get-to-file (url file &optional force)
   (interactive)
+  (require "ni/update-xyzzy") ;; for https-get-to-file
+  (if (url-https-p url)
+      (https-get-to-file url file)
+    (http-only-get-to-file url file force)))
+
+(defun http-only-get-to-file (url file &optional force)
+  (interactive)
   (let (sock
 	status
 	header
@@ -364,12 +371,12 @@
     ; 更新されていない
     (when (string-match "^304" status)
       (message "~A" status)
-      (return-from http-get-to-file))
+      (return-from http-only-get-to-file))
     ; Redirect
     (when (string-match "^302" status)
       (let ((location (http-get-header-value "location" header)))
 	(when location
-	  (return-from http-get-to-file
+	  (return-from http-only-get-to-file
 	    (http-get-to-file location file force)))))
     ; エラーステータス
     (unless (and (string-match "^2[0-9][0-9]" status)
