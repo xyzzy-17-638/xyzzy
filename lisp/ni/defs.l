@@ -95,6 +95,7 @@
 
 (defvar *http-show-status-message* t)
 
+(defvar *https-proxy-url* nil "httpsのproxy。192.168.0.9:8080 など。httpのproxyと違いhostとポートを同時に指定する事に注意。")
 (defvar *http-proxy-host* nil)          ; PROXY のホスト
 (defvar *http-proxy-port* nil)          ; PROXY のポート
 (defvar *http-direct-connect-list* nil) ; PROXY を経由しないホストのリスト

@@ -43,6 +43,8 @@ httpsからhttpへのredirectを許容しています。
 これはniの場合はhashを比較するので比較的安全ですが、それ以外の用途に使う場合は注意。"
   (unless *xhr*
     (setq *xhr* (ole-create-object "WinHttp.WinHttpRequest.5.1")))
+  (when *https-proxy-url*
+    (ole-method *xhr* 'SetProxy 2 *https-proxy-url*)) ;HTTPREQUEST_PROXYSETTING_PROXY 2
   (long-operation
     (ole-method *xhr* 'open "GET" url nil) ;; non-blocking and just sleep never change state. so use as blocking.
     (ole-putprop *xhr* 'Option t 6) ; enable redirect 6
