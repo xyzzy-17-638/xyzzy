@@ -17,6 +17,7 @@ src/r/
 etc/DOC
 src/Debug/xyzzy_mak.log
 src/Release/xyzzy_mak.log
+src/xyzzy.aps
 src/xyzzy.vcxproj.user
 src/xyzzy_mak.vcxproj.user
 src/gen_syms.vcxproj.user
