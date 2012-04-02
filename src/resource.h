@@ -1,5 +1,5 @@
 //{{NO_DEPENDENCIES}}
-// Microsoft Visual C++ generated include file.
+// Microsoft Developer Studio generated include file.
 // Used by xyzzy.rc
 //
 #define IDS_SELECT_BUFFER1              1
@@ -97,6 +97,7 @@
 #define IDS_HEADER_OFFSET_TOO_LARGE     101
 #define IDB_BITMAP1                     102
 #define IDS_FOOTER_OFFSET_TOO_LARGE     102
+#define IDI_XYZZY                       103
 #define IDD_HELPDLG                     104
 #define IDB_FILESEL                     106
 #define IDD_FONT                        108
@@ -109,6 +110,7 @@
 #define IDB_BITMAP2                     115
 #define IDC_MAGCUR                      116
 #define IDD_SELECT_DRIVE                117
+#define IDI_ICON1                       118
 #define IDD_MSGBOX                      120
 #define IDI_ICON2                       126
 #define IDI_ICON3                       127
@@ -131,8 +133,6 @@
 #define IDC_MOVEUD                      148
 #define IDC_MOVELR                      149
 #define IDM_PRINTFMT                    150
-#define IDI_XYZZY                       152
-#define IDI_ICON5                       153
 #define psh1                            0x0400
 #define psh2                            0x0401
 #define psh3                            0x0402
@@ -458,7 +458,7 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
-#define _APS_NEXT_RESOURCE_VALUE        155
+#define _APS_NEXT_RESOURCE_VALUE        151
 #define _APS_NEXT_COMMAND_VALUE         40035
 #define _APS_NEXT_CONTROL_VALUE         2141
 #define _APS_NEXT_SYMED_VALUE           101
