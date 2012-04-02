@@ -2,4 +2,4 @@
 ("author" . "mumurik765")
 ("url" . "https://raw.github.com/mumurik/xyzzy/tree/ni-integrate/latest-xyzzy-info.l")
 ("description" . "Xyzzyのマルチフレーム版配布サイトです。")
-("packages" (("name" . "xyzzy") ("version" . "0.2.3.7.1") ("author" . "mumurik765") ("file" . "multiframe_0_2_3_7_alpha2.zip") ("src" . "http://cdn.bitbucket.org/mumurik/xyzzy/downloads/multiframe_0_2_3_7_alpha2.zip") ("description" . "0.2.3.7 alpha2.") ("category") ("md5" . "5e3d138273534fc4490a1e04b97259bc") ("time" . 3542381631) ("depends") ("changes" . "Fix icon bug.") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))
+("packages" (("name" . "xyzzy") ("version" . "0.2.3.7.2") ("author" . "mumurik765") ("file" . "multiframe_0_2_3_7_alpha3.zip") ("src" . "http://cdn.bitbucket.org/mumurik/xyzzy/downloads/multiframe_0_2_3_7_alpha3.zip") ("description" . "0.2.3.7 alpha3.") ("category") ("md5" . "61ba315a8e1a1cd7323db5ed760fb9d4") ("time" . 3542382405) ("depends") ("changes" . "Fix of multiframe pos bug. Forgotten merge.") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))
