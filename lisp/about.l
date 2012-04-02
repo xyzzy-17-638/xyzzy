@@ -25,7 +25,7 @@
 		       #x50020000 34 7 123 8)
 		      (:link mail "Copyright (C) 1996-2005 \001Tetsuya Kamei\002"
 		       #x50020000 34 19 132 8)
-		      (:static nil "Icon designed by Yoshinori Watanabe."
+		      (:static nil "Icon designed by 797@2ch xyzzy Part 17."
 		       #x50020000 34 32 126 8)
 		      (:static nil "RSA Data Security, Inc." #x50020000 34 44 83 8)
 		      (:static nil "MD5 Message-Digest Algorithm." #x50020000 34 53 111 8)
