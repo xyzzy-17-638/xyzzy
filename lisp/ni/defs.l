@@ -76,6 +76,9 @@
 (defvar *install-site-file*
   (merge-pathnames "sites.l" *base-directory*))
 
+(defvar *initial-site-url* "https://raw.github.com/mumurik/NAXEL/master/packages.l"
+  "Initialized for this url when first launch netinstaller.")
+
 (defvar *local-data-file*
   (merge-pathnames "packages.l" *base-directory*))
 

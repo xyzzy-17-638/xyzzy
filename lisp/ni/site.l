@@ -105,26 +105,37 @@
 	(ni-error "不正なファイルです: ~%~A" file))
       (data-read-from-file file))))
 
+(defun setup-default-app-data()
+  (when *initial-site-url*
+    (update-site *initial-site-url*
+		 (site-create *initial-site-url*)
+		 -1)))
+
+(defun setup-app-data-from-sites(sites-temp sites)
+  (dolist (site sites-temp)
+    (handler-case
+	(let ((data (load-site-data-file site)))
+	  (when data
+	    (unless (site-src data)
+	      (push (cons "src" (site-src site)) data))
+	    (push data sites)
+	    (dolist (app (site-apps data))
+	      (setq app (app-data-add-site app data))
+	      (push app *app-data*))))
+      (error (c)
+	(ni-msgbox "Error:~%~A" (si:*condition-string c)))))
+  (setq *app-data*
+	(sort *app-data* #'app-newer-p)))
+
 (defun load-site-data ()
   (let (sites-temp sites)
     (when (file-exist-p *install-site-file*)
       (setq sites-temp
 	    (data-read-from-file *install-site-file*)))
     (setq *app-data* nil)
-    (dolist (site sites-temp)
-      (handler-case
-	  (let ((data (load-site-data-file site)))
-	    (when data
-	      (unless (site-src data)
-		(push (cons "src" (site-src site)) data))
-	      (push data sites)
-	      (dolist (app (site-apps data))
-		(setq app (app-data-add-site app data))
-		(push app *app-data*))))
-	(error (c)
-	  (ni-msgbox "Error:~%~A" (si:*condition-string c)))))
-    (setq *app-data*
-	  (sort *app-data* #'app-newer-p))
+    (if sites-temp
+	(setup-app-data-from-sites sites-temp sites)
+      (setup-default-app-data))
     (setq *site-data* (reverse sites))
     (category-parse)
     (save-site-data)))
@@ -222,6 +233,16 @@
 		(equal url (site-url x)))
 	    *site-data*))
 
+(defun update-site (src site pos)
+  (get-site-data site)
+  (let ((site (load-site-data-file site)))
+    (unless site
+      (ni-error "データを取得できません。"))
+    (setq site (set-site-data "src" src site))
+    (site-insert site (max pos 0)))
+  (save-site-data)
+  (load-site-data))
+
 (defun site-add (src)
   (interactive "sURL: ")
   (let* ((temp (site-create src))
@@ -231,15 +252,8 @@
 	 description)
     (when (site-exist-p src)
       (ni-error "すでに存在します: ~A" src))
-    (get-site-data temp)
-    (let ((site (load-site-data-file temp)))
-      (unless site
-	(ni-error "データを取得できません。"))
-      (setq site (set-site-data "src" src site))
-      (site-insert site (max pos 0))
-      (save-site-data)
-      (load-site-data)
-      (site-print))
+    (update-site src temp pos)
+    (site-print)
     (goto-line num)))
 
 (defun site-del ()

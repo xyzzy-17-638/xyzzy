@@ -34,3 +34,6 @@
 	     (not (si:*builtin-function-p #'si:*structure-reader)))
   (fmakunbound 'si:*structure-reader)
   (autoload 'si:*structure-reader "struct"))
+
+(export 'netinstaller)
+(autoload 'netinstaller "ni/setup" t)
