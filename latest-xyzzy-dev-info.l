@@ -2,4 +2,6 @@
 ("author" . "mumurik765")
 ("url" . "https://raw.github.com/mumurik/xyzzy/tree/ni-integrate/latest-xyzzy-info.l")
 ("description" . "Xyzzyのマルチフレーム版配布サイトです。")
-("packages" (("name" . "xyzzy") ("version" . "0.2.3.7.4") ("author" . "mumurik765") ("file" . "multiframe_0_2_3_7_alpha5.zip") ("src" . "https://bitbucket.org/mumurik/xyzzy/downloads/multiframe_0_2_3_7_alpha5.zip") ("description" . "0.2.3.7 alpha5.") ("category") ("md5" . "95159d90beced14b774da018497d84f0") ("time" . 3542549461) ("depends") ("changes" . "Fix ni sometime breaks existing sites.") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))
+("packages"
+ (("name" . "xyzzy") ("version" . "0.2.3.7.5") ("author" . "mumurik765") ("file" . "multiframe_0_2_3_7_alpha6.zip") ("src" . "https://bitbucket.org/mumurik/xyzzy/downloads/multiframe_0_2_3_7_alpha6.zip") ("description" . "0.2.3.7 alpha6.") ("category") ("md5" . "f20aadc6fadac201cb1cc904095cedcd") ("time" . 3542561950) ("depends") ("changes" . "Now ni::local-app-add format packages.l (for github merge).") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . ""))
+ )
