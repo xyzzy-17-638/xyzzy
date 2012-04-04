@@ -26,8 +26,29 @@
       (setq *local-data*
 	    (data-read-from-file *local-data-file*)))))
 
+(defun format-packages()
+  (interactive)
+  (save-excursion
+    (goto-line 5) ;; "packages". it might contain this string for author etc. So I use line number.
+    (beginning-of-line)
+    (forward-char)
+    (search-forward "(")
+    (lisp-newline-and-indent)
+    (goto-matched-parenthesis)
+    (forward-char)
+    (lisp-newline-and-indent)
+    (while (looking-at "(")
+      (goto-matched-parenthesis)
+      (forward-char)
+      (lisp-newline-and-indent))))
+  
+
 (defun save-local-data ()
-  (data-write-to-file *local-data-file* *local-data*))
+  (data-write-to-file *local-data-file* *local-data*)
+  (save-window-excursion
+    (find-file *local-data-file*)
+    (format-packages)
+    (save-buffer)))
 
 (defun create-site-data (&optional site)
   (list (cons "name" (site-name site))
