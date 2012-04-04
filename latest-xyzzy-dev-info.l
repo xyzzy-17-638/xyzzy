@@ -2,4 +2,4 @@
 ("author" . "mumurik765")
 ("url" . "https://raw.github.com/mumurik/xyzzy/tree/ni-integrate/latest-xyzzy-info.l")
 ("description" . "Xyzzyのマルチフレーム版配布サイトです。")
-("packages" (("name" . "xyzzy") ("version" . "0.2.3.7.3") ("author" . "mumurik765") ("file" . "multiframe_0_2_3_7_alpha4.zip") ("src" . "https://bitbucket.org/mumurik/xyzzy/downloads/multiframe_0_2_3_7_alpha4.zip") ("description" . "0.2.3.7 alpha4.") ("category") ("md5" . "a700691b39f677c0661b9d9a8144547f") ("time" . 3542428605) ("depends") ("changes" . "Support NAXEL without any setting.") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))
+("packages" (("name" . "xyzzy") ("version" . "0.2.3.7.4") ("author" . "mumurik765") ("file" . "multiframe_0_2_3_7_alpha5.zip") ("src" . "https://bitbucket.org/mumurik/xyzzy/downloads/multiframe_0_2_3_7_alpha5.zip") ("description" . "0.2.3.7 alpha5.") ("category") ("md5" . "95159d90beced14b774da018497d84f0") ("time" . 3542549461) ("depends") ("changes" . "Fix ni sometime breaks existing sites.") ("notice" . "") ("load-after-install" . "") ("load-before-uninstall" . "")))
