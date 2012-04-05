@@ -389,6 +389,7 @@ static const Unicode32Sjis unicode32Sjis[] = {
 	{ 0x829c, 0x2013 }, //1-3-92		二分ダーシ/ダッシュ（二分）	ダッシュ (記号)
 	{ 0x829D, 0x29FA },	//# DOUBLE PLUS	[2000]	[Unicode3.2]
 	{ 0x829E, 0x29FB },	//# TRIPLE PLUS	[2000]	[Unicode3.2]
+	{ 0x82F2, 0x3094 },	//# 濁点付き平仮名う
 	{ 0x82F3, 0x3095 },	//# HIRAGANA LETTER SMALL KA	[2000]	[Unicode3.2]
 	{ 0x82F4, 0x3096 },	//# HIRAGANA LETTER SMALL KE	[2000]	[Unicode3.2]
 	{ 0x83b7, 0x2664 }, //1-6-25		スペード（白）	スペード (シンボル)
