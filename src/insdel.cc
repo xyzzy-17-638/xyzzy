@@ -4,6 +4,8 @@
 #include "sequence.h"
 #include "byte-stream.h"
 
+bool utf16_sjis2004_combine_pair_p (ucs2_t c0, ucs2_t c1, Char& cc);
+
 #ifdef DEBUG
 void
 Buffer::check_valid () const
@@ -493,22 +495,36 @@ Buffer::insert_chars_internal (Point &point, const insertChars *ichars_,
           for (int i = 0; i < rest; ++i)
             {
               Char c = s[i];
-              if (utf16_surrogate_high_p (c) && i < rest-1)
+              if (i < rest-1 && utf16_surrogate_high_p (c) && utf16_surrogate_low_p (s[i+1]))
                 {
-                  Char c2 = s[i+1];
-                  if(utf16_surrogate_low_p (c2))
+                  ucs4_t ucs4 = utf16_pair_to_ucs4 (c, s[i+1]);
+                  extern int ucs4SurrogatePairToSjis (ucs4_t ucs4);
+                  int sjis = ucs4SurrogatePairToSjis (ucs4);
+                  if (sjis)
                     {
-                      ucs4_t ucs4 = utf16_pair_to_ucs4 (c, c2);
-                      extern int ucs4SurrogatePairToSjis (ucs4_t ucs4);
-                      int sjis = ucs4SurrogatePairToSjis (ucs4);
-                      if (sjis)
-                        {
-                          c = sjis;
-                          i += 1;
-                        }
+                      c = sjis;
+                      i += 1;
                     }
                 }
-              *w++ = c;
+
+				if(i < rest-2)
+				{
+					Char c2 = s[i+1];
+					Char c3 = s[i+2];
+					if(utf16_undef_char_high_p (c2) && utf16_undef_char_low_p (c3))
+					{
+						ucs2_t t = i2w(c);
+						ucs2_t u = utf16_undef_pair_to_ucs2 (c2, c3);
+						Char sjis;
+						if (utf16_sjis2004_combine_pair_p (t, u, sjis))
+						{
+							c = sjis;
+							i += 2;
+						}
+					}
+				}
+
+				*w++ = c;
             }
 
           dc->string  = dstr;
@@ -1183,9 +1199,10 @@ make_cf_wtext (CLIPBOARDTEXT &clp, lisp string)
   const Char *const se = s + xstring_length (string);
 
   extern ucs4_t sjisToSurrogatePair(int sjis);
+  extern ucs4_t sjisToCombinePair (int sjis);
   int extra;
   for (extra = 0; s < se; s++)
-    if (*s == '\n' || sjisToSurrogatePair (*s))
+    if (*s == '\n' || sjisToSurrogatePair (*s) || sjisToCombinePair (*s))
       extra++;
 
   clp.fmt = CF_UNICODETEXT;
@@ -1205,6 +1222,11 @@ make_cf_wtext (CLIPBOARDTEXT &clp, lisp string)
             *b++ = utf16_ucs4_to_pair_high (ucs4);
             c = utf16_ucs4_to_pair_low (ucs4);
           }
+		else if((ucs4 = sjisToCombinePair(*s)) != 0)
+		{
+			*b++ = (ucs4 >> 16);
+			c = ucs4 & 0xffff;
+		}
         else
           {
             c = i2w (*s);

@@ -16,6 +16,8 @@ text_drop_target tdropt;
 
 mouse_wheel g_wheel;
 
+extern bool utf16_sjis2004_combine_pair_p(ucs2_t c0, ucs2_t c1, Char& cc);
+
 static u_int __stdcall
 quit_thread_entry (void *p)
 {
@@ -510,6 +512,12 @@ ime_composition (ApplicationFrame *app1, HWND hwnd, LPARAM lparam)
                               cc = (Char) sjis;
                               sp += 1;
                             }
+                        }
+                      else if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil
+                               && sp+1 < se
+                               && utf16_sjis2004_combine_pair_p (sp[0], sp[1], cc))
+                        {
+                          sp += 1;
                         }
                       app1->kbdq.putc (cc);
                     }

@@ -4,6 +4,9 @@
 #include "ibmext.h"
 #include "utf2sjis.h"
 
+bool utf16_sjis2004_combine_pair_p (ucs2_t c0, ucs2_t c1, Char& cc);
+bool sjis_to_utf16_combine_pair_p (Char cc, ucs2_t& c0, ucs2_t& c1);
+
 u_char escseq_euckr[] = {ccs_usascii, ccs_ksc5601, ccs_invalid, ccs_invalid};
 u_char escseq_eucgb[] = {ccs_usascii, ccs_gb2312, ccs_invalid, ccs_invalid};
 u_int designatable_any[] = {u_int (-1), u_int (-1), u_int (-1), u_int (-1)};
@@ -756,7 +759,6 @@ utf16_to_internal_stream::refill_internal_le ()
       int c2 = s_in.get ();
       if (c2 == eof)
         break;
-
       ucs2_t c = (c2 << 8) | c1;
       if(utf16_surrogate_high_p (c))
         {
@@ -795,10 +797,37 @@ utf16_to_internal_stream::refill_internal_le ()
                 }
             }
         }
-      else
-        {
-          putw (c);
-        }
+		else
+		{
+          int c3 = s_in.get ();
+          if(c3 == eof)
+            {
+              putw (c);
+              break;
+            }
+          int c4 = s_in.get ();
+          if(c4 == eof)
+            {
+              putw (c);
+              break;
+            }
+          ucs2_t d = (c4 << 8) | c3;
+		  Char sjis;
+		  if (utf16_sjis2004_combine_pair_p (c, d, sjis))
+		  {
+			  put (sjis);
+		  }
+		  else
+		  {
+              putw (c);
+              s_in.putback (c4);
+              s_in.putback (c3);
+		  }
+		}
+//      else
+//        {
+//          putw (c);
+//        }
     }
 }
 
@@ -853,9 +882,36 @@ utf16_to_internal_stream::refill_internal_be ()
             }
         }
       else
-        {
-          putw (c);
-        }
+	  {
+          int c3 = s_in.get ();
+          if(c3 == eof)
+            {
+              putw (c);
+              break;
+            }
+          int c4 = s_in.get ();
+          if(c4 == eof)
+            {
+              putw (c);
+              break;
+            }
+          ucs2_t d = (c3 << 8) | c4;
+		  Char sjis;
+		  if (utf16_sjis2004_combine_pair_p (c, d, sjis))
+		  {
+			  put (sjis);
+		  }
+		  else
+		  {
+              putw (c);
+              s_in.putback (c4);
+              s_in.putback (c3);
+		  }
+	  }
+//      else
+//        {
+//          putw (c);
+//        }
     }
 }
 
@@ -916,6 +972,8 @@ u_char utf8_chmask[] = {0x00, 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f};
 void
 utf8_to_internal_stream::refill_internal ()
 {
+	int lastCode = UCS4_EOF;
+
   while (room () > 0)
     {
       int c = s_in.get ();
@@ -923,14 +981,33 @@ utf8_to_internal_stream::refill_internal ()
         break;
       try
         {
-          ucs4_t code = getch_utf8_to_ucs4 (c, s_in);
-          if (code != UCS4_EOF)
-            putl (code);
+//          ucs4_t code = getch_utf8_to_ucs4 (c, s_in);
+//          if (code != UCS4_EOF)
+//            putl (code);
+			Char cc;
+			ucs4_t code = getch_utf8_to_ucs4 (c, s_in);
+			if(lastCode != UCS4_EOF && code != UCS4_EOF && utf16_sjis2004_combine_pair_p((ucs2_t)lastCode, (ucs2_t)code, cc))
+			{
+				put (cc);
+				lastCode = UCS4_EOF;
+			}
+			else
+			{
+				if(lastCode != UCS4_EOF)
+				{
+					putl ((ucs4_t) lastCode);
+				}
+				lastCode = code;
+			}
         }
       catch (std::exception)
         {
         }
     }
+  if (lastCode != UCS4_EOF)
+  {
+    putl ((ucs4_t) lastCode);
+  }
 }
 
 utf7_to_internal_stream::utf7_to_internal_stream (xinput_stream <u_char> &in,
@@ -1647,6 +1724,14 @@ internal_to_utf_stream::getw () const
         return ucs4;
       }
   }
+	{
+		extern ucs4_t sjisToCombinePair (int sjis);
+		ucs4_t ucs4 = sjisToCombinePair (cc);
+		if(ucs4)
+		{
+			return ucs4;
+		}
+	}
 
   if (!(s_flags & ENCODING_UTF_WINDOWS) && cc != Char (-1))
     {
@@ -1710,13 +1795,26 @@ internal_to_utf16le_stream::refill ()
 
       if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil && c >= 0x10000)
         {
-          ucs4_t u4 = (ucs4_t) c;
-          ucs2_t c1 = utf16_ucs4_to_pair_high (u4);
-          ucs2_t c2 = utf16_ucs4_to_pair_low (u4);
-          put ((u_char) (c1));
-          put ((u_char) (c1 >> 8));
-          put ((u_char) (c2));
-          put ((u_char) (c2 >> 8));
+			if(c > 0x01000000)
+			{
+				ucs4_t u4 = (ucs4_t) c;
+				ucs2_t c1 = (c >> 16) & 0xffff;
+				ucs2_t c2 = (c >>  0) & 0xffff;
+				put ((u_char) (c1));
+				put ((u_char) (c1 >> 8));
+				put ((u_char) (c2));
+				put ((u_char) (c2 >> 8));
+			}
+			else
+			{
+	          ucs4_t u4 = (ucs4_t) c;
+	          ucs2_t c1 = utf16_ucs4_to_pair_high (u4);
+	          ucs2_t c2 = utf16_ucs4_to_pair_low (u4);
+	          put ((u_char) (c1));
+	          put ((u_char) (c1 >> 8));
+	          put ((u_char) (c2));
+	          put ((u_char) (c2 >> 8));
+			}
         }
       else
         {
@@ -1776,12 +1874,24 @@ internal_to_utf16be_stream::refill ()
       if(xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil && c >= 0x10000)
         {
           ucs4_t ucs4 = (ucs4_t) c;
-          ucs2_t c1 = utf16_ucs4_to_pair_high(ucs4);
-          ucs2_t c2 = utf16_ucs4_to_pair_low(ucs4);
-          put ((u_char) (c1 >> 8));
-          put ((u_char) (c1));
-          put ((u_char) (c2 >> 8));
-          put ((u_char) (c2));
+			if(ucs4 >= 0x01000000)
+			{
+	          ucs2_t c1 = (ucs4 >> 16) & 0xffff;
+	          ucs2_t c2 = (ucs4 >>  0) & 0xffff;
+	          put ((u_char) (c1 >> 8));
+	          put ((u_char) (c1));
+	          put ((u_char) (c2 >> 8));
+	          put ((u_char) (c2));
+			}
+			else
+			{
+	          ucs2_t c1 = utf16_ucs4_to_pair_high(ucs4);
+	          ucs2_t c2 = utf16_ucs4_to_pair_low(ucs4);
+	          put ((u_char) (c1 >> 8));
+	          put ((u_char) (c1));
+	          put ((u_char) (c2 >> 8));
+	          put ((u_char) (c2));
+			}
         }
       else
         {
@@ -1876,12 +1986,27 @@ internal_to_utf8_stream::refill ()
           put (u_char (0x80 | ((lc >> 6) & 0x3f)));
           put (u_char (0x80 | (lc & 0x3f)));
         }
-      else /* lc < 0x200000(0x110000) */
+      else if (lc < 0x01000000)
         {
           put (u_char (0xf0 | ((lc >> 18) & 7)));
           put (u_char (0x80 | ((lc >> 12) & 0x3f)));
           put (u_char (0x80 | ((lc >> 6) & 0x3f)));
           put (u_char (0x80 | (lc & 0x3f)));
+        }
+      else
+        {
+			{
+				ucs4_t l = (lc >> 16) & 0xffff;
+			      put (u_char (0xe0 | ((l >> 12) & 0xf)));
+			      put (u_char (0x80 | ((l >> 6) & 0x3f)));
+			      put (u_char (0x80 | (l & 0x3f)));
+			}
+			{
+				ucs4_t l = (lc >>  0) & 0xffff;
+			      put (u_char (0xe0 | ((l >> 12) & 0xf)));
+			      put (u_char (0x80 | ((l >> 6) & 0x3f)));
+			      put (u_char (0x80 | (l & 0x3f)));
+			}
         }
     }
   return finish ();

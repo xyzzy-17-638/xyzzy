@@ -446,6 +446,90 @@ sjisToSurrogatePair (int sjis)
     }
 }
 
+bool
+utf16_sjis2004_combine_pair_p (ucs2_t c0, ucs2_t c1, Char& cc)
+{
+	const UnicodeCombineSjis* u = 0;
+	if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil)
+	{
+      const int n = (int) sizeof (unicodeCombineSjis) / sizeof (unicodeCombineSjis[0]);
+      for (int i = 0; i < n; ++i)
+        {
+          const UnicodeCombineSjis* p = &unicodeCombineSjis[i];
+          if (p->ucs2[0] == c0 && p->ucs2[1] == c1)
+            {
+              u = p;
+              break;
+            }
+        }
+    }
+	if (u)
+	{
+		cc = u->sjis;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+bool
+sjis_to_utf16_combine_pair_p (Char cc, ucs2_t& c0, ucs2_t& c1)
+{
+	const UnicodeCombineSjis* u = 0;
+	if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil)
+	{
+      const int n = (int) sizeof (unicodeCombineSjis) / sizeof (unicodeCombineSjis[0]);
+      for (int i = 0; i < n; ++i)
+        {
+          const UnicodeCombineSjis* p = &unicodeCombineSjis[i];
+          if (p->sjis == cc)
+            {
+              u = p;
+              break;
+            }
+        }
+    }
+	if (u)
+	{
+		c0 = u->ucs2[0];
+		c1 = u->ucs2[1];
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+ucs4_t
+sjisToCombinePair (int sjis)
+{
+	const UnicodeCombineSjis* u = 0;
+	if (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil)
+	{
+      const int n = (int) sizeof (unicodeCombineSjis) / sizeof (unicodeCombineSjis[0]);
+      for (int i = 0; i < n; ++i)
+        {
+          const UnicodeCombineSjis* p = &unicodeCombineSjis[i];
+          if (p->sjis == sjis)
+            {
+              u = p;
+              break;
+            }
+        }
+    }
+	if (u)
+	{
+		return (u->ucs2[0] << 16) | (u->ucs2[1]);
+	}
+	else
+	{
+		return 0;
+	}
+}
+
 static int
 getUtf16Code (int sjis, wchar_t* out)
 {
@@ -461,12 +545,19 @@ getUtf16Code (int sjis, wchar_t* out)
   else
     {
       ucs4_t ucs4 = (xsymbol_value (Vpseudo_shift_jis_2004_p) != Qnil) ? sjisToSurrogatePair (sjis) : 0;
+		ucs2_t ucs2[2];
       if (ucs4)
         {
           out[0] = utf16_ucs4_to_pair_high (ucs4);
           out[1] = utf16_ucs4_to_pair_low (ucs4);
           ret = 2;
         }
+      else if (sjis_to_utf16_combine_pair_p (sjis, ucs2[0], ucs2[1]))
+	  {
+		  out[0] = ucs2[0];
+		  out[1] = ucs2[1];
+		  ret = 2;
+	  }
       else
         {
 			int o = 0;
