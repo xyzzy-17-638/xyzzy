@@ -31,7 +31,7 @@
   (save-excursion
     (goto-line 5) ;; "packages". it might contain this string for author etc. So I use line number.
     (beginning-of-line)
-    (forward-char)
+    (search-forward "packages")
     (search-forward "(")
     (lisp-newline-and-indent)
     (goto-matched-parenthesis)
