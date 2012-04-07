@@ -1,8 +1,7 @@
-$Id: readme.txt 753 2007-11-21 11:46:20Z torihat $
-
  NetInstaller for xyzzy
 
  by Masashi Hattori
+ modified by mumurik765
 
 ■ NetInstaller for xyzzy とは？
 
@@ -29,6 +28,7 @@ $Id: readme.txt 753 2007-11-21 11:46:20Z torihat $
 		;; PROXYを通す場合
 		;(setq ni::*http-proxy-host* "proxy.host")  ; PROXY のホスト
 		;(setq ni::*http-proxy-port* 8080)          ; PROXY のポート
+		;(setq ni::*https-proxy-url* "proxy.host:8080") ; httpsのPROXY。httpと違いホストとポート一緒に指定
 
 ■起動
 
