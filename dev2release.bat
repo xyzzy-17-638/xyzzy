@@ -1,0 +1,1 @@
+copy latest-xyzzy-dev-info.l latest-xyzzy-info.l 
