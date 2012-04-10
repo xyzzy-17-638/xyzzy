@@ -575,6 +575,13 @@ init_ucs2_table ()
   init_wc2gb2312_table ();
 #endif
 	{
+		// 初期化時に
+		// 		wc2internal_table[0x3094] = 0x8394
+		// となっている (U+3094:ひらがな「う」に濁点を、ShiftJIS8394:カタカナ「ウ」に濁点にマッピング)
+		// ため、これをあらかじめつぶしておく
+		int utf16_hiragana_vu = 0x3094;
+		wc2internal_table[utf16_hiragana_vu] = 0xffff;
+		wc2cp932_table[utf16_hiragana_vu] = 0xffff;
 #include "unicode-3.1-sjis.h"
 		for(size_t i = 0; i < sizeof(unicode32Sjis)/sizeof(unicode32Sjis[0]); ++i) {
 			const Unicode32Sjis& e = unicode32Sjis[i];
