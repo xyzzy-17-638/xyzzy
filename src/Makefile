@@ -2,7 +2,7 @@
 # define VC++ version (4, 6, or 7)
 VCVER=10
 
-.SUFFIXES: .cc .rc .res .d
+.SUFFIXES: .cc .rc .res .d .asm
 
 SRCS=\
 Buffer.cc \
@@ -116,6 +116,7 @@ usertab.cc \
 usertool.cc \
 utils.cc \
 utimer.cc \
+vc-compat.cc \
 vector.cc \
 version.cc \
 vfs.cc \
@@ -124,6 +125,9 @@ winhelp.cc \
 wstream.cc \
 xdde.cc \
 xlist.cc
+
+ASMS=\
+vc-compat-entry.asm
 
 PRIVCTRLDIR=../privctrl
 PRIVCTRLOBJS=\
@@ -148,6 +152,11 @@ CXX=cl -nologo -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS
 CXX=cl -nologo
 !ENDIF
 CPP=cl -nologo -E
+ASM=ml -nologo
+ASMFLAGS=-DVCVER=$(VCVER)
+EDITBIN=editbin -nologo
+SUBSYS_WINDOWS=/SUBSYSTEM:WINDOWS,5.0
+SUBSYS_CONSOLE=/SUBSYSTEM:CONSOLE,5.0
 LD=link -nologo
 LIBS=kernel32.lib user32.lib gdi32.lib advapi32.lib shell32.lib \
 comctl32.lib imm32.lib setargv.obj comdlg32.lib mpr.lib ole32.lib \
@@ -157,7 +166,7 @@ INC=-I$(PRIVCTRLDIR)
 SPC=""
 SPC=$(SPC:""= )
 
-OBJS=$(SPC)$(SRCS:.cc=.obj)
+OBJS=$(SPC)$(SRCS:.cc=.obj) $(ASMS:.asm=.obj)
 OBJS=$(OBJS:  = )
 
 
@@ -195,6 +204,9 @@ FINAL_TARGET=../$(BUILD)
 
 .d.h:
 	dpp $< $@
+
+.asm{$(OUTDIR)/}.obj:
+	$(ASM) $(ASMFLAGS) -c /Fo$@ $<
 
 all: $(OUTDIR) dpp.exe includes ../xyzzyenv.exe \
      $(FINAL_TARGET) ../xyzzycli.exe libxpi.lib
@@ -241,10 +253,12 @@ realclean: distclean
 	del /F jisx0212-width.h lucida-width.h ucs2tab.h fontrange.h
 
 ../$(BUILD): $(OUTDIR)/$(BUILD)
+	$(EDITBIN) $(OUTDIR)\$(BUILD) $(SUBSYS_WINDOWS)
 	copy $(OUTDIR)\$(BUILD) .. > nul
 	copy $(OUTDIR)\xyzzy.map .. > nul
 
 ../xyzzyenv.exe: xyzzyenv.exe
+	$(EDITBIN) xyzzyenv.exe $(SUBSYS_CONSOLE)
 	copy xyzzyenv.exe .. > nul
 
 xyzzyenv.exe: xyzzyenv.cc xyzzyenv.res
@@ -252,6 +266,7 @@ xyzzyenv.exe: xyzzyenv.cc xyzzyenv.res
 	   -link -fixed -subsystem:console -entry:process_startup
 
 ../xyzzycli.exe: xyzzycli.exe
+	$(EDITBIN) xyzzycli.exe $(SUBSYS_WINDOWS)
 	copy xyzzycli.exe .. > nul
 
 CLIENT_OBJS=xyzzycli.obj
