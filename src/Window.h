@@ -447,11 +447,11 @@ struct Window
   enum {LINENUM_COLUMNS = 6};
   static int w_hjump_columns;
 
-  mode_line_point_painter w_point_painter;
+  int w_point_pixel;
+  int w_last_ml_column;
+  int w_last_ml_linenum;
+  int w_last_ml_point_width;
   SIZE w_ml_size;
-
-  int w_last_percentage;
-  int w_percentage_pixel;
 
   enum
     {
@@ -698,6 +698,7 @@ struct Window
   int frame_window_resize (HWND, const POINT &, int);
 
   int redraw_mode_line ();
+  int paint_mode_line_point (HDC);
   static void modify_all_mode_line ();
 
   void update_mode_line_vars (int, lisp);

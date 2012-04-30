@@ -3400,7 +3400,6 @@ mode_line_point_painter::paint_point (HDC hdc)
   return right;
 }
 
-
 void
 Window::paint_mode_line (HDC hdc)
 {
@@ -3513,8 +3512,6 @@ Window::paint_mode_line (HDC hdc)
       ExtTextOut (hdc, r.left, 1 + w_owner->modeline_param.m_exlead,
                   ETO_OPAQUE | ETO_CLIPPED, &r, b1, b - b1, 0);
     }
-
-
 
   SelectObject (hdc, of);
   SetTextColor (hdc, ofg);
