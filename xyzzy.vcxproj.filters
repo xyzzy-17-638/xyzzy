@@ -402,6 +402,12 @@
     <ClCompile Include="src\system.cc">
       <Filter>ソース ファイル\ed</Filter>
     </ClCompile>
+    <ClCompile Include="src\frame.cc">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="src\unzip.cc">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="src\xyzzy.gen.rc">
@@ -767,6 +773,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="src\system.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="src\unzip.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

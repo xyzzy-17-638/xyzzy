@@ -167,6 +167,7 @@
     <ClCompile Include="src\filer.cc" />
     <ClCompile Include="src\fnkey.cc" />
     <ClCompile Include="src\font.cc" />
+    <ClCompile Include="src\frame.cc" />
     <ClCompile Include="src\gime.cc" />
     <ClCompile Include="src\glob.cc" />
     <ClCompile Include="src\guid.cc" />
@@ -230,6 +231,7 @@
     <ClCompile Include="src\toplev.cc" />
     <ClCompile Include="src\ucs2.cc" />
     <ClCompile Include="src\undo.cc" />
+    <ClCompile Include="src\unzip.cc" />
     <ClCompile Include="src\usertab.cc" />
     <ClCompile Include="src\usertool.cc" />
     <ClCompile Include="src\utils.cc" />
@@ -418,6 +420,7 @@
     <ClInclude Include="src\thread.h" />
     <ClInclude Include="src\timer.h" />
     <ClInclude Include="src\trace.h" />
+    <ClInclude Include="src\unzip.h" />
     <ClInclude Include="src\utils.h" />
     <ClInclude Include="src\utimer.h" />
     <ClInclude Include="src\vector.h" />
