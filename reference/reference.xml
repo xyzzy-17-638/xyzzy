@@ -29076,13 +29076,8 @@ catchで指定されたラベルまで、非局所脱出します。
   %m    モード 
   %k    エンコーディング 
   %l    改行コード 
-
-備考：
-  モードラインのフォーマットとほぼ同様ですが、
-  %i, %P, %/ はタイトルバーでは設定できません。
-
-備考：
-  %$ は xyzzy 0.2.2.236 から利用可能です。
+  %i    IMEの状態。mode-line-formatのみ。 
+  %P    カーソル位置。mode-line-formatのみ。
 </description>
 <seealso>mode-line-format</seealso>
 <link></link>
