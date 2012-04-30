@@ -857,7 +857,7 @@ environ::save_geometry ()
       if (GetWindowPlacement (active_app_frame().toplev, &w))
         {
           RECT r;
-          if (save_window_snap_size && w.showCmd == SW_SHOWNORMAL && GetWindowRect (app.toplev, &r))
+          if (save_window_snap_size && w.showCmd == SW_SHOWNORMAL && GetWindowRect (active_app_frame().toplev, &r))
             {
               w.rcNormalPosition.left = r.left;
               w.rcNormalPosition.top = r.top;

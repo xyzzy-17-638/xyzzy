@@ -2501,7 +2501,7 @@ tool_bm::load (const char *path, int &e)
         return p;
       }
 
-  bm_node *p = new bm_node;
+  p = new bm_node;
   p->b_path = strdup (path);
   if (p->b_path)
     {

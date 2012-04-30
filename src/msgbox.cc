@@ -140,7 +140,7 @@ XMessageBox::init_dialog ()
     }
 
   RECT warea;
-  monitor.get_workarea_from_window (app.toplev, &warea);
+  monitor.get_workarea_from_window (active_app_frame().toplev, &warea);
 
   LONG maxw = (warea.right - warea.left) * 4 / 5;
   LONG maxh = (warea.bottom - warea.top) * 3 / 4;
