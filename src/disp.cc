@@ -3406,7 +3406,6 @@ Window::paint_mode_line (HDC hdc)
 {
   char *b0, *b;
   char *posp = 0;
-  char *percentp = 0;
 
   w_ime_mode_line = 0;
   lisp fmt = symbol_value (Vmode_line_format, w_bufp);
@@ -3417,7 +3416,7 @@ Window::paint_mode_line (HDC hdc)
       b = b0;
       *b++ = ' ';
 
-      buffer_info binfo (this, w_bufp, &posp, &w_ime_mode_line, &percentp);
+      buffer_info binfo (this, w_bufp, &posp, &w_ime_mode_line);
       b = binfo.format (fmt, b, b0 + l);
     }
   else
