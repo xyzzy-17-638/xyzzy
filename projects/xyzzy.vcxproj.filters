@@ -396,9 +396,6 @@
     <ClCompile Include="..\src\gen\msgdef.cc">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\stdafx.cc">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\privctrl\listviewex.cc">
       <Filter>ソース ファイル\privctrl</Filter>
     </ClCompile>
@@ -409,6 +406,12 @@
       <Filter>ソース ファイル\privctrl</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sha2.cc">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\frame.cc">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\unzip.cc">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
@@ -772,9 +775,6 @@
     <ClInclude Include="..\src\guess.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\stdafx.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\targetver.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -786,6 +786,9 @@
     </ClInclude>
     <ClInclude Include="..\src\privctrl\privctrl.h">
       <Filter>ヘッダー ファイル\privctrl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\unzip.h">
+      <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

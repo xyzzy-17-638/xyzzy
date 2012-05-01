@@ -21,13 +21,13 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
+    <PlatformToolset>v100</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
+    <PlatformToolset>v100</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -58,7 +58,7 @@
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CallingConvention>StdCall</CallingConvention>
@@ -94,7 +94,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;STRICT;WIN32;_WIN32;_MT;__XYZZY__;PRIVCTRL_NODLL;HAVE_DIMM_H;DEBUG_GC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <StringPooling>true</StringPooling>
@@ -169,6 +169,7 @@
     <ClCompile Include="..\src\filer.cc" />
     <ClCompile Include="..\src\fnkey.cc" />
     <ClCompile Include="..\src\font.cc" />
+    <ClCompile Include="..\src\frame.cc" />
     <ClCompile Include="..\src\gime.cc" />
     <ClCompile Include="..\src\glob.cc" />
     <ClCompile Include="..\src\guess.cc" />
@@ -223,9 +224,6 @@
     <ClCompile Include="..\src\sock.cc" />
     <ClCompile Include="..\src\sockinet.cc" />
     <ClCompile Include="..\src\statarea.cc" />
-    <ClCompile Include="..\src\stdafx.cc">
-      <PrecompiledHeader>Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="..\src\stdctl.cc" />
     <ClCompile Include="..\src\StrBuf.cc" />
     <ClCompile Include="..\src\stream.cc" />
@@ -240,6 +238,7 @@
     <ClCompile Include="..\src\toplev.cc" />
     <ClCompile Include="..\src\ucs2.cc" />
     <ClCompile Include="..\src\undo.cc" />
+    <ClCompile Include="..\src\unzip.cc" />
     <ClCompile Include="..\src\usertab.cc" />
     <ClCompile Include="..\src\usertool.cc" />
     <ClCompile Include="..\src\utils.cc" />
@@ -402,7 +401,6 @@
     <ClInclude Include="..\src\sock.h" />
     <ClInclude Include="..\src\sockinet.h" />
     <ClInclude Include="..\src\statarea.h" />
-    <ClInclude Include="..\src\stdafx.h" />
     <ClInclude Include="..\src\StrBuf.h" />
     <ClInclude Include="..\src\stream.h" />
     <ClInclude Include="..\src\string.h" />
@@ -417,6 +415,7 @@
     <ClInclude Include="..\src\thread.h" />
     <ClInclude Include="..\src\timer.h" />
     <ClInclude Include="..\src\trace.h" />
+    <ClInclude Include="..\src\unzip.h" />
     <ClInclude Include="..\src\utils.h" />
     <ClInclude Include="..\src\utimer.h" />
     <ClInclude Include="..\src\vector.h" />
