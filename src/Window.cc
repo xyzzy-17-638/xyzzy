@@ -956,7 +956,7 @@ Window::compute_geometry (ApplicationFrame *owner, const SIZE &old_size, int lce
     new_h = old_h;
 
   wp->w_rect.bottom = new_size.cy;
-  wp->w_rect.top = new_size.cy - h;
+  wp->w_rect.top = new_size.cy - new_h;
   wp->calc_client_size (wp->w_rect.right - sysdep.edge.cx,
                         wp->w_rect.bottom - wp->w_rect.top - sysdep.edge.cy);
 

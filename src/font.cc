@@ -513,7 +513,7 @@ FontSet::update (FontSetParam &param, const lisp lfontset) const
 lisp
 Fget_text_fontset ()
 {
-  return app.text_font.make_alist ();
+  return active_app_frame().text_font.make_alist ();
 }
 
 lisp
@@ -522,7 +522,7 @@ Fset_text_fontset (lisp lfontset)
   check_cons (lfontset);
 
   FontSetParam param;
-  if (!app.text_font.update (param, lfontset))
+  if (!active_app_frame().text_font.update (param, lfontset))
     return Qnil;
 
   Window::change_parameters (param);
