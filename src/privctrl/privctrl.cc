@@ -1,4 +1,5 @@
-#include "stdafx.h"
+#include <windows.h>
+#include <commctrl.h>
 #define EXTERN
 #include "privctlimpl.h"
 
