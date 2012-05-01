@@ -131,8 +131,7 @@ iset::find_topic (ifile *f)
     return;
   nbytes -= sizeof nbytes;
 
-  int i = 0;
-  for (; i < f->if_nfiles; i++)
+  for (int i = 0; i < f->if_nfiles; i++)
     f->if_headers[i].ih_match = iheader::nomatch;
 
 #define GETC() (--nbytes < 0 ? EOF : getc (f->if_fp))

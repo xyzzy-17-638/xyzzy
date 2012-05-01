@@ -63,8 +63,7 @@ void
 EnvStrings::setup (lisp lenv)
 {
   int n = 0, l = 0;
-  lisp le = lenv;
-  for (; consp (le); le = xcdr (le), n++)
+  for (lisp le = lenv; consp (le); le = xcdr (le), n++)
     {
       lisp x = xcar (le);
       check_cons (x);
@@ -77,8 +76,7 @@ EnvStrings::setup (lisp lenv)
         }
     }
 
-  int d = 0;
-  for (; d < 26; d++)
+  for (int d = 0; d < 26; d++)
     {
       const char *dir = get_device_dir (d);
       int x = strlen (dir);
@@ -89,8 +87,7 @@ EnvStrings::setup (lisp lenv)
         }
     }
 
-  char **e;
-  for (e = environ; *e; e++, n++)
+  for (char **e = environ; *e; e++, n++)
     ;
 
   l = (l + sizeof (char **) - 1) / sizeof (char **) * sizeof (char **);
@@ -122,8 +119,7 @@ EnvStrings::setup (lisp lenv)
   qsort (nb, ne - nb, sizeof *nb, compare);
 
   l = 1;
-  char **np = nb;
-  for (; np < ne; np++)
+  for (char **np = nb; np < ne; np++)
     if (**np)
       l += strlen (*np) + 1;
 
@@ -267,7 +263,6 @@ Fcall_process (lisp cmd, lisp keys)
 
   w2s (dir, xsymbol_value (Qdefault_dir));
   WINFS::SetCurrentDirectory (dir);
-
 
   DWORD exit_code = 0;
   if (!result)

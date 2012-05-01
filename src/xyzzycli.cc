@@ -173,8 +173,7 @@ create_sexp (xyzzysrv &sv, int ac, char **av)
   char curdir[MAX_PATH + 1];
   GetCurrentDirectory (sizeof curdir, curdir);
   int l = 256 + lstrlen (curdir) * 2;
-  int i = 0;
-  for (; i < ac; i++)
+  for (int i = 0; i < ac; i++)
     l += lstrlen (av[i]) * 2 + 3;
 
   if (!sv.alloc (l))
@@ -246,13 +245,12 @@ find_server (lookup_server &ls)
 static int
 run_xyzzy (int argc, char **argv, const char *xyzzy)
 {
-  int l = lstrlen (xyzzy) + 1, i = 1;
-  for (;
-       i < argc; l += lstrlen (argv[i]) + 1, i++)
+  int l = lstrlen (xyzzy) + 1;
+  for (int i = 1; i < argc; l += lstrlen (argv[i]) + 1, i++)
     ;
   char *const cl = (char *)_alloca (l);
   char *p = stpcpy (cl, xyzzy);
-  for (i = 1; i < argc; i++)
+  for (int i = 1; i < argc; i++)
     {
       *p++ = ' ';
       p = stpcpy (p, argv[i]);
@@ -287,8 +285,8 @@ wait_term (xyzzysrv &sv)
 static int
 skip_args (int argc, char **argv)
 {
-  int ac = 1;
-  for (; ac < argc - 1; ac += 2)
+  int ac;
+  for (ac = 1; ac < argc - 1; ac += 2)
     if (lstrcmp (argv[ac], "-image")
         && lstrcmp (argv[ac], "-config")
         && lstrcmp (argv[ac], "-ini"))

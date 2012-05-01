@@ -186,8 +186,7 @@ scan_key_slot (lisp keymap, Char c, int igcase)
     }
 
   lisp cc = make_char (c);
-  lisp p;
-  for (p = keymap; consp (p); p = xcdr (p))
+  for (lisp p = keymap; consp (p); p = xcdr (p))
     {
       lisp x = xcar (p);
       if (consp (x) && xcar (x) == cc)

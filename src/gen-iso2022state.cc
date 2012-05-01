@@ -50,8 +50,7 @@ main ()
   int chars_max = 1;
 
   memset (chars_buf, 0, sizeof chars_buf);
-  int i;
-  for (i = 0; i < numberof (escseq); i++)
+  for (int i = 0; i < numberof (escseq); i++)
     for (const char *p = escseq[i].s; *p; p++)
       if (!chars[*p])
         {

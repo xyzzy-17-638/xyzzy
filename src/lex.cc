@@ -222,8 +222,7 @@ lex_env::lambda_bind (lisp lambda_list, lisp params,
 
   if (consp (lambda_list) && xcar (lambda_list) == Qkey)
     {
-	  lisp p;
-      for (p = params; consp (p); p = xcdr (p))
+      for (lisp p = params; consp (p); p = xcdr (p))
         {
           check_symbol (xcar (p));
           p = xcdr (p);

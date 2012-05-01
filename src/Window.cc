@@ -710,14 +710,22 @@ Window::invalidate_glyphs ()
   w_cursor_line.ypixel = -1;
 }
 
+void
+Window::change_parameters (const FontSetParam &param)
+{
+  change_parameters (param, 0, 0, 0, 0, false);
+}
+
 // static!
 void
 Window::change_parameters (const FontSetParam &param,
                            const XCOLORREF *colors, const XCOLORREF *mlcolors,
-                           const XCOLORREF *fg, const XCOLORREF *bg)
+                           const XCOLORREF *fg, const XCOLORREF *bg,
+                           bool change_color_p)
 {
   // move init_colors outside of loop. Is this really OK?
-  init_colors (colors, mlcolors, fg, bg);
+  if (change_color_p)
+    init_colors (colors, mlcolors, fg, bg);
   for(ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next)
   {
 	  int ocell = app1->text_font.cell ().cy;
@@ -932,15 +940,20 @@ Window::compute_geometry (ApplicationFrame *owner, const SIZE &old_size, int lce
 
   const SIZE &new_size = owner->active_frame.size;
 
+  // compute minibuffer window geometry
   Window *wp;
   for (wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
     ;
   wp->w_rect.left = 0;
   wp->w_rect.right = new_size.cx;
-  int h = max (int ((wp->w_rect.bottom - wp->w_rect.top)
-                    * owner->text_font.cell ().cy / lcell),
-               lcell);
-  h = max (h, int (owner->text_font.cell ().cy + 4));
+  int old_h = wp->w_rect.bottom - wp->w_rect.top;
+  int old_l = static_cast<int> (old_h / lcell);
+  int new_h = old_l * owner->text_font.cell ().cy + 4;
+  int min_h =  owner->text_font.cell ().cy + 4;
+  int max_h = new_size.cy - (sysdep.edge.cy + FRAME_WIDTH + min_h +  owner->modeline_param.m_height + 4);
+  new_h = max (new_h, min_h);
+  if (max_h < new_h)
+    new_h = old_h;
 
   wp->w_rect.bottom = new_size.cy;
   wp->w_rect.top = new_size.cy - h;
@@ -957,6 +970,7 @@ Window::compute_geometry (ApplicationFrame *owner, const SIZE &old_size, int lce
       oh = max (oh, wp->w_rect.bottom);
     }
 
+  // compute normal windows geometry
   int *const ox = (int *)alloca (sizeof *ox * (nx + 1));
   int *const oy = (int *)alloca (sizeof *oy * (ny + 1));
   for (wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
@@ -968,7 +982,7 @@ Window::compute_geometry (ApplicationFrame *owner, const SIZE &old_size, int lce
     }
 
   compute_size (ox, nx, ow, new_size.cx);
-  compute_size (oy, ny, oh, new_size.cy - h);
+  compute_size (oy, ny, oh, new_size.cy - new_h);
 
   for (wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
     {

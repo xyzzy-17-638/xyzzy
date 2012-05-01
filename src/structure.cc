@@ -34,7 +34,6 @@ Fsi_make_structure_definition (lisp name, lisp type, lisp include,
 
   int ooffset = -1;
   int nslots = 0;
-  
   for (lisp sl = slots; consp (sl); sl = xcdr (sl))
     {
       lisp s = xcar (sl);

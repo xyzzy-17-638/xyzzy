@@ -1902,8 +1902,7 @@ Regexp::closure_backtrack (re_point &point, const Char *p, const Char *pe,
       if (nmatches >= nmax)
         break;
 
-	  int i;
-      for (i = 0; i < fstack->b_used; i++)
+      for (int i = 0; i < fstack->b_used; i++)
         if (!fstack->b_stack[i].match_void)
           {
             int l = fstack->b_stack[i].point.p_point - beg;

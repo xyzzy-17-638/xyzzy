@@ -147,8 +147,7 @@ Buffer::point_linenum (point_t goal) const
       linenum += cp->c_nlines;
       point += cp->c_used;
     }
-  const Char *p = cp->c_text, *pe = p + goal - point;
-  for (; p < pe; p++)
+  for (const Char *p = cp->c_text, *pe = p + goal - point; p < pe; p++)
     if (*p == '\n')
       linenum++;
   return linenum;

@@ -264,14 +264,14 @@ ZEXTERN int ZEXPORT deflate OF((z_streamp strm, int flush));
     should be set only when necessary (in interactive applications).  Some
     output may be provided even if flush is not set.
 
-  Before the call of deflate(), the application should ensure that at least
-  one of the actions is possible, by providing more input and/or consuming
-  more output, and updating avail_in or avail_out accordingly; avail_out
-  should never be zero before the call. The application can consume the
-  compressed output when it wants, for example when the output buffer is full
-  (avail_out == 0), or after each call of deflate(). If deflate returns Z_OK
-  and with zero avail_out, it must be called again after making room in the
-  output buffer because there might be more output pending.
+    Before the call of deflate(), the application should ensure that at least
+  one of the actions is possible, by providing more input and/or consuming more
+  output, and updating avail_in or avail_out accordingly; avail_out should
+  never be zero before the call.  The application can consume the compressed
+  output when it wants, for example when the output buffer is full (avail_out
+  == 0), or after each call of deflate().  If deflate returns Z_OK and with
+  zero avail_out, it must be called again after making room in the output
+  buffer because there might be more output pending.
 
     Normally the parameter flush is set to Z_NO_FLUSH, which allows deflate to
   decide how much data to accumulate before producing output, in order to

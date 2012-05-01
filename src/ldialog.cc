@@ -33,8 +33,7 @@ void
 Dialog::enable_windows (dlgctrl *c, int status)
 {
   lisp kwd = c->keyword ();
-  lisp grp;
-  for (grp = safe_find_keyword (Kenable, kwd); consp (grp); grp = xcdr (grp))
+  for (lisp grp = safe_find_keyword (Kenable, kwd); consp (grp); grp = xcdr (grp))
     {
       dlgctrl *x = get_item (xcar (grp));
       if (x)
@@ -815,8 +814,7 @@ Dialog::spin_invalidate (class dlgctrl *)
 void
 Dialog::init_items ()
 {
-  lisp p;
-  for (p = d_item; consp (p); p = xcdr (p))
+  for (lisp p = d_item; consp (p); p = xcdr (p))
     {
       dlgctrl *c = (dlgctrl *)xcar (p);
       lisp wclass = c->wclass ();

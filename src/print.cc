@@ -514,8 +514,7 @@ print_engine::~print_engine ()
 void
 print_engine::init_font (HDC hdc)
 {
-  int i ;
-  for (i = 0; i < FONT_MAX; i++)
+  for (int i = 0; i < FONT_MAX; i++)
     pe_hfonts[i] = pe_settings.make_font (hdc, pe_dev, i);
 
   HGDIOBJ of = SelectObject (hdc, pe_hfonts[FONT_ASCII]);

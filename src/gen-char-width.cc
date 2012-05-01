@@ -24,8 +24,7 @@ main ()
 #define OFF(X) (width[(X) / 8] &= ~(1 << ((X) % 8)))
   u_char width[65536 / 8];
   memset (width, 0, sizeof width);
-  int i = 0;
-  for (; i < 32; i += 8)
+  for (int i = 0; i < 32; i += 8)
     ON8 (i);
   ON (127);
 

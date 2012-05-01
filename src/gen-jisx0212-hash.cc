@@ -7,8 +7,7 @@ main ()
 {
   Char ic[sizeof jisx0212_width_table * 8];
   int nic = 0;
-  int i;
-  for (i = 0; i < sizeof jisx0212_width_table; i++)
+  for (int i = 0; i < sizeof jisx0212_width_table; i++)
     for (int j = 0; j < 8; j++)
       if (!(jisx0212_width_table[i] & (1 << j)))
         ic[nic++] = CCS_JISX0212_MIN + i * 8 + j;

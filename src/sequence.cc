@@ -525,13 +525,12 @@ Freplace (lisp seq1, lisp seq2, lisp keys)
                 seq2 = Fnthcdr (make_fixnum (start2), seq2);
                 safe_ptr <char> sp (new char [sizeof (lisp) * l]);
                 lisp *x = (lisp *)(char *)sp;
-				int i = 0;
-                for (; i < l; i++, seq2 = xcdr (seq2))
+                for (int i = 0; i < l; i++, seq2 = xcdr (seq2))
                   {
                     assert (consp (seq2));
                     x[i] = xcar (seq2);
                   }
-                for (i = 0; i < l; i++, seq1 = xcdr (seq1))
+                for (int i = 0; i < l; i++, seq1 = xcdr (seq1))
                   {
                     assert (consp (seq1));
                     xcar (seq1) = x[i];
@@ -641,15 +640,14 @@ Freplace (lisp seq1, lisp seq2, lisp keys)
             l = min (end1 - start1, end2 - start2);
             end2 = start2 + l;
             seq2 = Fnthcdr (make_fixnum (start2), seq2);
-			lisp p = seq2;
-            for (; start2 < end2; start2++, p = xcdr (p))
+            for (lisp p = seq2; start2 < end2; start2++, p = xcdr (p))
               {
                 assert (consp (p));
                 check_char (xcar (p));
               }
             Char *s = xstring_contents (seq1) + start1;
             Char *se = s + l;
-            for (p = seq2; s < se; p = xcdr (p), s++)
+            for (lisp p = seq2; s < se; p = xcdr (p), s++)
               *s = xchar_code (xcar (p));
           }
           break;
@@ -660,11 +658,10 @@ Freplace (lisp seq1, lisp seq2, lisp keys)
             l = min (end1 - start1, end2 - start2);
             lisp *v0 = xvector_contents (seq2) + start2;
             lisp *ve = v0 + l;
-			lisp *v = v0;
-            for (; v < ve; v++)
+            for (lisp *v = v0; v < ve; v++)
               check_char (*v);
             Char *s = xstring_contents (seq1) + start1;
-            for (v = v0; v < ve; v++, s++)
+            for (lisp *v = v0; v < ve; v++, s++)
               *s = xchar_code (*v);
           }
           break;
@@ -770,8 +767,7 @@ xdelete (lisp seq, test_proc &test, lisp keys)
             safe_ptr <char> sp (new char [sizeof (lisp) * l]);
             lisp *v = (lisp *)(char *)sp;
             lisp p = seq;
-			int i = 0;
-            for (; i < l; i++, p = xcdr (p))
+            for (int i = 0; i < l; i++, p = xcdr (p))
               v[i] = xcar (p);
             int n = xdelete (test, v, start, end, from_end,
                              lcount == Qnil ? l : fixnum_value (lcount), l);
@@ -781,6 +777,7 @@ xdelete (lisp seq, test_proc &test, lisp keys)
               {
                 p = seq;
                 n--;
+                int i;
                 for (i = 0; i < n; i++, p = xcdr (p))
                   xcar (p) = v[i];
                 assert (consp (p));

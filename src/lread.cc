@@ -1157,8 +1157,7 @@ number_A_reader (lisp stream, Char, dispmacro_param &param)
     reader_error (stream, Earray_rank_too_large);
 
   int *dims = (int *)alloca (sizeof (int) * rank);
-  int i;
-  for (i = 0; i < rank; i++)
+  for (int i = 0; i < rank; i++)
     dims[i] = -1;
 
   count_dimensions (stream, object, dims, rank - 1);

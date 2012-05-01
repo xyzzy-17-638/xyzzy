@@ -67,7 +67,7 @@ main (int argc, char **argv)
   else if (!strcmp (argv[1], "-enum"))
     {
       printf ("enum message_code\n{\n");
-	  int i;
+      int i;
       for (i = 0; i < numberof (msg) - 1; i++)
         printf ("  %s,\n", msg[i].ident);
       printf ("  %s\n", msg[i].ident);
@@ -76,8 +76,7 @@ main (int argc, char **argv)
   else if (!strcmp (argv[1], "-c"))
     {
       printf ("const char SSM[] =\n");
-	  int i;
-      for (i = 0; i < numberof (msg); i++)
+      for (int i = 0; i < numberof (msg); i++)
         {
           printf ("  \"");
           print_quote (msg[i].text);

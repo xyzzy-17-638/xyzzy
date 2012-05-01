@@ -84,11 +84,10 @@ save_match (const Regexp &re, lisp str)
 static void
 bm_compilef (int *BM, const Char *pattern, int patlen, int case_fold)
 {
-  int i;
-  for (i = 0; i < 256; i++)
+  for (int i = 0; i < 256; i++)
     BM[i] = patlen;
 
-  for (i = patlen - 1; i >= 0; i--)
+  for (int i = patlen - 1; i >= 0; i--)
     {
       Char cc = *pattern++;
       int c = DBCP (cc) ? cc >> 8 : cc;
