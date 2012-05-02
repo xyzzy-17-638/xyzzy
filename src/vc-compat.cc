@@ -62,20 +62,20 @@ xyzzySetDllDirectoryA (LPCSTR lpPathName)
 // GetNativeSystemInfo
 // http://msdn.microsoft.com/en-us/library/windows/desktop/ms724340(v=vs.85).aspx
 //
-extern "C" BOOL __stdcall
+extern "C" void __stdcall
 xyzzyGetNativeSystemInfo (LPSYSTEM_INFO lpSystemInfo)
 {
   static const char szModule[] = "KERNEL32";
   static const char szProc[] = "GetNativeSystemInfo";
-  typedef BOOL (WINAPI *FUNC)(LPSYSTEM_INFO);
+  typedef void (WINAPI *FUNC)(LPSYSTEM_INFO);
   static void *procPtr = PROC_PTR_UNINITIALIZED;
 
   procPtr = getModuleProcAddress (procPtr, szModule, szProc);
-  BOOL ret = 0;
   if (procPtr) {
-    ret = ((FUNC)procPtr)(lpSystemInfo);
+    ((FUNC)procPtr)(lpSystemInfo);
+  } else {
+    GetSystemInfo (lpSystemInfo);
   }
-  return ret;
 }
 
 
