@@ -241,6 +241,23 @@ ApplicationFrame::coerce_to_frame (lisp object)
   return xappframe_fp (object);
 }
 
+static u_long
+find_open_appframe_id()
+{
+    u_long new_app_index = 1;
+    {
+      std::vector<u_long> v;
+      for (ApplicationFrame *app1 = root; app1; app1 = app1->a_next)
+        v.push_back (app1->frame_index);
+      if (!v.empty ())
+        {
+          std::sort( v.begin (), v.end () );
+          for (std::vector<u_long>::const_iterator it = v.begin (); it != v.end (); ++it, ++new_app_index)
+            if (*it != new_app_index) break;
+        }
+    }
+	return new_app_index;
+}
 
 // --- below here is lisp functions.
 lisp
@@ -258,18 +275,7 @@ Fmake_frame (lisp opt)
         window->save_buffer_params ();
       }
 
-    u_long new_app_index = 1;
-    {
-      std::vector<u_long> v;
-      for (ApplicationFrame *app1 = root; app1; app1 = app1->a_next)
-        v.push_back (app1->frame_index);
-      if (!v.empty ())
-        {
-          std::sort( v.begin (), v.end () );
-          for (std::vector<u_long>::const_iterator it = v.begin (); it != v.end (); ++it, ++new_app_index)
-            if (*it != new_app_index) break;
-        }
-    }
+    u_long new_app_index = find_open_appframe_id();
 
 	ApplicationFrame* new_app = new ApplicationFrame();
 	ApplicationFrame* next = root->a_next;
