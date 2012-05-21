@@ -3417,8 +3417,8 @@ Window::paint_mode_line (HDC hdc)
       b = b0;
       *b++ = ' ';
 
-      buffer_info binfo (this, w_bufp, &posp, &w_ime_mode_line, &percentp);
-      b = binfo.format (fmt, b, b0 + l, w_owner);
+      buffer_info binfo (w_owner, this, w_bufp, &posp, &w_ime_mode_line, &percentp);
+      b = binfo.format (fmt, b, b0 + l);
     }
   else
     b0 = b = 0;

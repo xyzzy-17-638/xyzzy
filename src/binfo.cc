@@ -202,7 +202,7 @@ buffer_info::percent (char *b, char *be) const
 }
 
 char *
-buffer_info::frame_index (char *b, char *be, ApplicationFrame* app1) const
+buffer_info::frame_index (char *b, char *be, const ApplicationFrame* app1) const
 {
   if (app1)
     {
@@ -214,7 +214,7 @@ buffer_info::frame_index (char *b, char *be, ApplicationFrame* app1) const
 }
 
 char *
-buffer_info::format (lisp fmt, char *b, char *be, ApplicationFrame* app1) const
+buffer_info::format (lisp fmt, char *b, char *be) const
 {
   if (b_posp)
     *b_posp = 0;
@@ -318,7 +318,7 @@ buffer_info::format (lisp fmt, char *b, char *be, ApplicationFrame* app1) const
               break;
 
             case 'x':
-              b = frame_index (b, be, app1);
+              b = frame_index (b, be, b_app);
               break;
             }
         }
