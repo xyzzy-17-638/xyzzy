@@ -1,14 +1,13 @@
 ;;; -*- Mode: Lisp; Package: EDITOR -*-
 ;;;
-;;; This file is not part of xyzzy.
+;;; This file is part of xyzzy.
 ;;;
 
-(require "ni/setup")
-(netinst::load-install-data)
-
-(provide "niseaboutd")
+(provide "about")
 
 (in-package "editor")
+
+(export 'about-dialog)
 
 (let ((dialog-template nil))
   (defun about-dialog ()
@@ -24,16 +23,17 @@
 		      (:link xyzzy ,(concat "\001xyzzy\002 version "
 					    (software-version-display-string))
 		       #x50020000 34 7 123 8)
-		      (:link mail ,(format-date-string "Copyright (C) 1996-%Y \001Tetsuya Kamei\002" (get-universal-time))
+		      (:static nil "Copyright (C) 1996-2005 Tetsuya Kamei"
 		       #x50020000 34 19 132 8)
-		      (:static nil "All rights reserved." #x50020000 34 28 68 8)
-		      (:static nil "Icon designed by Yoshinori Watanabe."
-		       #x50020000 34 40 126 8)
+		      (:link org "Copyright (C) 2012 \001xyzzy Project\002"
+		       #x50020000 34 28 132 8)
+		      (:static nil "Icon designed by 797@2ch xyzzy Part 17."
+		       #x50020000 34 41 126 8)
 		      (:static nil "RSA Data Security, Inc." #x50020000 34 52 83 8)
 		      (:static nil "MD5 Message-Digest Algorithm." #x50020000 34 61 111 8)
-		      (:listbox list  nil #x50a10111 33 72 138 60)
+		      (:listbox list  nil #x50a10111 34 72 170 60)
 		      (:static nil "Šg’£lisp" #x50020000 34 140 111 8)
-		      (:listbox lis   nil #x50a10111 33 150 138 60)))))
+		      (:listbox lis   nil #x50a10111 34 150 170 60)))))
     (dialog-box dialog-template
 		(list (cons 'list
 			    (long-operation
@@ -43,16 +43,19 @@
 						 (list (list (get x 'archiver-dll-file-name)
 							     version)))))
 				      *archiver-dll-list*)))
-		      (when (find "ni/setup" *modules* :test 'string=)
-			(cons 'lis
-			      (mapcan #'(lambda (x)
-					  (list
-					   (list (cdr (assoc "name" x :test 'string=))
-						 (cdr (assoc "version" x :test 'string=)))))
-				      (sort (copy-list netinst::*install-data*)
-					    #'string-lessp
-					    :key #'(lambda (x) (cdr (assoc "name" x :test 'string=))))))))
-		'((xyzzy :url "http://www.jsdlab.co.jp/~kamei/")
-		  (mail :url "mailto:kamei@jsdlab.co.jp")
+		      (and (find-package "netinst")
+			   (find-symbol "*install-data*" "netinst")
+			   (cons 'lis
+				 (mapcan #'(lambda (x)
+					     (list
+					      (list (cdr (assoc "name" x :test 'string=))
+						    (cdr (assoc "version" x :test 'string=)))))
+					 (sort (copy-list
+						(or (symbol-value (find-symbol "*install-data*" "netinst"))
+						    (funcall (find-symbol "load-install-data" "netinst"))))
+					       #'string-lessp
+					       :key #'(lambda (x) (cdr (assoc "name" x :test 'string=))))))))
+		'((xyzzy :url "https://bitbucket.org/mumurik/xyzzy")
+		  (org :url "https://bitbucket.org/mumurik/xyzzy")
 		  (list :column (28 10))
 		  (lis :column (28 10))))))
