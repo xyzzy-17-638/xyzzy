@@ -259,7 +259,7 @@ class special_bind
 {
   lisp *vec;
   char *flags;
-  int n;
+  int vec_length;
 
 public:
   special_bind (lisp *, char *, int);
@@ -268,15 +268,19 @@ public:
 
 inline
 special_bind::special_bind (lisp *v, char *f, int nv)
-     : vec (v), flags (f), n (nv)
+     : vec (v), flags (f), vec_length (nv)
 {
 }
 
 inline
 special_bind::~special_bind ()
 {
-  for (int i = n - 2, j = n/2 - 1; i >= 0; i -= 2, j--)
+  assert(vec_length%2 == 0);
+  int i = 0;
+  for (int k = 0; k < vec_length; k += 2)
     {
+      i = vec_length-k-2;
+      int j = i/2;
       assert (consp (vec[i]));
       assert (symbolp (xcar (vec[i])));
       assert (xcdr (vec[i]) == Qunbound);
@@ -288,6 +292,7 @@ special_bind::~special_bind ()
       xcdr (vec[i]) = xsymbol_value (sym);
       xsymbol_value (sym) = vec[i + 1];
     }
+  assert(i == 0);
 }
 
 static lisp
@@ -296,7 +301,8 @@ declare_progn (lisp body, lex_env &lex, int can_doc)
   int nvars = 0;
   int nspecials = 0;
 
-  for (lisp e = lex.lex_var; e != lex.lex_ltail; e = xcdr (e))
+  lisp e;
+  for (e = lex.lex_var; e != lex.lex_ltail; e = xcdr (e))
     {
       lisp x = xcar (e);
       if (consp (x) && symbolp (xcar (x))
@@ -305,7 +311,7 @@ declare_progn (lisp body, lex_env &lex, int can_doc)
     }
 
   int doc = can_doc;
-  lisp nbody;
+  lisp nbody ;
   for (nbody = body; consp (nbody); nbody = xcdr (nbody))
     {
       lisp x = xcar (nbody);
@@ -454,7 +460,8 @@ funcall_builtin (lisp f, lisp arglist)
 #ifdef _M_IX86
   int nargs = xfunction_nargs (f) + xfunction_nopts (f) + (need_rest_p (f) ? 1 : 0);
   lisp *stack = (lisp *)alloca (sizeof (lisp) * nargs);
-  for (int i = xfunction_nargs (f); i > 0; i--)
+  int i ;
+  for (i = xfunction_nargs (f); i > 0; i--)
     {
       if (!consp (arglist))
         FEtoo_few_arguments ();
@@ -700,6 +707,7 @@ Feval (lisp arg)
 {
   lex_env lex;
   enable_quit eq;
+  defer_change_focus dcf;
   return eval (arg, lex);
 }
 
@@ -712,6 +720,7 @@ Fevalhook (lisp form, lisp evalhook, lisp applyhook, lisp env)
   dynamic_bind dynb3 (Vbypass_evalhook, boole (evalhook != Qnil));
   dynamic_bind dynb4 (Vbypass_applyhook, Qnil);
   enable_quit eq;
+  defer_change_focus dcf;
   return eval (form, lex);
 }
 
@@ -752,6 +761,7 @@ Ffuncall (lisp fn, lisp args)
     gc (-1);
 
   enable_quit eq;
+  defer_change_focus dcf;
 
   multiple_value::clear ();
 
@@ -809,6 +819,7 @@ Fapplyhook (lisp fn, lisp args, lisp evalhook, lisp applyhook)
   dynamic_bind dynb3 (Vbypass_evalhook, Qnil);
   dynamic_bind dynb4 (Vbypass_applyhook, boole (applyhook != Qnil));
   enable_quit eq;
+  defer_change_focus dcf;
   return Ffuncall (fn, args);
 }
 
@@ -1922,7 +1933,7 @@ process_interactive_string (lisp fmt, lisp args)
               {
                 lisp def = load_default (args, nargs);
                 if (def == Qnil)
-                  def = c == 'B' ? Fother_buffer (0) : Fselected_buffer ();
+                  def = c == 'B' ? Fother_buffer (0) : Fselected_buffer (Qnil);
                 if (bufferp (def))
                   def = Fbuffer_name (def);
                 v1 = complete_read (p0, p - p0, def,
@@ -2033,6 +2044,7 @@ lisp
 Fcommand_execute (lisp command, lisp hook)
 {
   enable_quit eq;
+  defer_change_focus dcf;
 
   lisp fn = command;
   if (symbolp (fn))

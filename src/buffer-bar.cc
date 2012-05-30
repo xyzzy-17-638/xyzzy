@@ -3,13 +3,18 @@
 #include "mainframe.h"
 #include "buffer-bar.h"
 #include "colors.h"
+#include <map>
 
-buffer_bar *buffer_bar::b_bar;
-Buffer *buffer_bar::b_last_buffer;
+typedef std::map<ApplicationFrame*, buffer_bar*> app_buf_map;
+static app_buf_map g_buffer_bar_map;
+typedef std::pair<buffer_bar*,Buffer*> bar_buf_pair;
+typedef std::map<bar_buf_pair, int> bufbar_buf_flag_map;
+static bufbar_buf_flag_map g_modified_flag;
+
 
 #pragma warning (disable: 4355)
-buffer_bar::buffer_bar (dock_frame &frame)
-     : tab_bar (frame, Vbuffer_bar), b_drop_target (this), b_drop_index (-1)
+buffer_bar::buffer_bar (ApplicationFrame* app, dock_frame &frame)
+	: tab_bar (app, frame, Vbuffer_bar), b_drop_target (this), b_drop_index (-1), b_last_checked_version(-1), b_item_deleted(false), b_last_buffer(0)
 {
 }
 #pragma warning (default: 4355)
@@ -37,6 +42,7 @@ buffer_bar::set_buffer_name (const Buffer *bp, char *buf, int size)
 int
 buffer_bar::insert (const Buffer *bp, int i)
 {
+  b_buf_map[(Buffer*)bp] = true;
   TC_ITEM ti;
   ti.mask = TCIF_TEXT | TCIF_PARAM;
   char buf[BUFFER_NAME_MAX * 2 + 32];
@@ -66,8 +72,8 @@ buffer_bar::notify (NMHDR *nm, LRESULT &result)
 
     case TCN_SELCHANGE:
     case TCN_SELCHANGING:
-      if (!app.kbdq.idlep ()
-          || selected_window ()->minibuffer_window_p ())
+      if (!b_app_frame->kbdq.idlep ()
+          || selected_window (b_app_frame)->minibuffer_window_p ())
         {
           result = 1; // prevent the selection
           return 1;
@@ -82,7 +88,7 @@ buffer_bar::notify (NMHDR *nm, LRESULT &result)
     {
       try
         {
-          selected_buffer ()->run_hook (Vbuffer_bar_hook, bp->lbp);
+          selected_buffer (b_app_frame)->run_hook (Vbuffer_bar_hook, bp->lbp);
         }
       catch (nonlocal_jump &)
         {
@@ -121,15 +127,15 @@ buffer_bar::need_text (TOOLTIPTEXT &ttt)
 void
 buffer_bar::tab_color (const Buffer *bp, COLORREF &fg, COLORREF &bg)
 {
-  if (bp == selected_buffer ())
+  if (bp == selected_buffer (b_app_frame))
     {
       fg = get_misc_color (MC_BUFTAB_SEL_FG);
       bg = get_misc_color (MC_BUFTAB_SEL_BG);
     }
   else
     {
-      Window *wp;
-      for (wp = app.active_frame.windows; wp; wp = wp->w_next)
+	  Window *wp;
+      for (wp = b_app_frame->active_frame.windows; wp; wp = wp->w_next)
         if (wp->w_bufp == bp)
           {
             fg = get_misc_color (MC_BUFTAB_DISP_FG);
@@ -152,9 +158,9 @@ buffer_bar::draw_item (const draw_item_struct &dis)
   set_buffer_name (bp, buf, sizeof buf);
 
   if (bp->b_modified)
-    bp->b_buffer_bar_modified |= Buffer::BUFFER_BAR_LAST_MODIFIED_FLAG;
+    g_modified_flag[bar_buf_pair(this,bp)] |= BUFFER_BAR_LAST_MODIFIED_FLAG;
   else
-    bp->b_buffer_bar_modified &= ~Buffer::BUFFER_BAR_LAST_MODIFIED_FLAG;
+    g_modified_flag[bar_buf_pair(this,bp)] &= ~BUFFER_BAR_LAST_MODIFIED_FLAG;
 
   COLORREF fg, bg;
   tab_color (bp, fg, bg);
@@ -174,14 +180,13 @@ buffer_bar::insert_buffers ()
     if (!bp->internal_buffer_p ())
       {
         insert (bp, i);
-        if (bp == selected_buffer ())
+        if (bp == selected_buffer (b_app_frame))
           current = i;
         i++;
-        bp->b_buffer_bar_modified &= Buffer::BUFFER_BAR_LAST_MODIFIED_FLAG;
+        g_modified_flag[bar_buf_pair(this, bp)] &= BUFFER_BAR_LAST_MODIFIED_FLAG;
       }
   if (current >= 0)
     set_cursel (current);
-  Buffer::b_buffer_bar_modified_any = 0;
   set_redraw ();
 }
 
@@ -194,18 +199,82 @@ buffer_bar::create (HWND hwnd_parent)
   return 1;
 }
 
-int
-buffer_bar::make_instance ()
+buffer_bar*
+buffer_bar::make_instance (ApplicationFrame* app)
 {
-  if (!b_bar)
+	app_buf_map::iterator it = g_buffer_bar_map.find(app);
+	if(it != g_buffer_bar_map.end())
+	{
+		return it->second;
+	}
+	buffer_bar* bar = new buffer_bar (app, *app->mframe);
+	if (!bar->create (app->toplev)) {
+		delete bar;
+		return 0;
+	}
+	bar->insert_buffers ();
+	app->mframe->add (bar);
+	g_buffer_bar_map[app] = bar;
+	return bar;
+}
+
+void buffer_bar::buffer_deleted (Buffer *bp)
+{
+	for(ApplicationFrame *app = first_app_frame(); app; app = app->a_next)
+	{
+		app_buf_map::iterator it = g_buffer_bar_map.find(app);
+		if(it != g_buffer_bar_map.end())
+		{
+			it->second->delete_buffer(bp);
+		}
+	}
+}
+
+Buffer *buffer_bar::next_buffer (Buffer *bp)
+{
+  app_buf_map::iterator it = g_buffer_bar_map.find(&active_app_frame());
+  if(it != g_buffer_bar_map.end())
     {
-      b_bar = new buffer_bar (g_frame);
-      if (!b_bar->create (app.toplev))
-        return 0;
-      b_bar->insert_buffers ();
-      g_frame.add (b_bar);
+      return it->second->next_buffer(bp, 1);
     }
-  return 1;
+  return 0;
+}
+
+Buffer *buffer_bar::prev_buffer (Buffer *bp)
+{
+  app_buf_map::iterator it = g_buffer_bar_map.find(&active_app_frame());
+  if(it != g_buffer_bar_map.end())
+    {
+      return it->second->next_buffer (bp, -1);
+    }
+  return 0;
+}
+Buffer *buffer_bar::get_top_buffer ()
+{
+  app_buf_map::iterator it = g_buffer_bar_map.find(&active_app_frame());
+  if(it != g_buffer_bar_map.end())
+    {
+      return it->second->top_buffer ();
+    }
+  return 0;
+}
+Buffer *buffer_bar::get_bottom_buffer ()
+{
+  app_buf_map::iterator it = g_buffer_bar_map.find(&active_app_frame());
+  if(it != g_buffer_bar_map.end())
+    {
+      return it->second->bottom_buffer ();
+    }
+  return 0;
+}
+lisp buffer_bar::list_buffers ()
+{
+  app_buf_map::iterator it = g_buffer_bar_map.find(&active_app_frame());
+  if(it != g_buffer_bar_map.end())
+    {
+      return it->second->buffer_list ();
+    }
+  return 0;
 }
 
 void
@@ -219,7 +288,7 @@ buffer_bar::delete_buffer (Buffer *bp)
       Buffer *p = nth (i);
       if (p == bp)
         found = i;
-      if (p == selected_buffer ())
+      if (p == selected_buffer (b_app_frame))
         current = i;
       if (found >= 0 && current >= 0)
         break;
@@ -228,7 +297,9 @@ buffer_bar::delete_buffer (Buffer *bp)
     set_cursel (current);
   if (found >= 0)
     delete_item (found);
-  Buffer::b_buffer_bar_modified_any |= Buffer::BUFFER_BAR_DELETED;
+  b_item_deleted = true;
+  b_buf_map.erase(bp);
+  ++Buffer::b_last_modified_version_number;
 }
 
 Buffer *
@@ -266,13 +337,15 @@ void
 buffer_bar::update_ui ()
 {
   int n = item_count ();
-  if (Buffer::b_buffer_bar_modified_any & Buffer::BUFFER_BAR_CREATED)
+  buf_bool_map newly_inserted;
+  if (b_last_checked_version != Buffer::b_last_modified_version_number)
     {
       set_no_redraw ();
 
       int nbuffers = 0;
-      for (Buffer *bp = Buffer::b_blist; bp; bp = bp->b_next)
-        if (bp->b_buffer_bar_modified & Buffer::BUFFER_BAR_CREATED
+	  Buffer *bp;
+      for (bp = Buffer::b_blist; bp; bp = bp->b_next)
+		if (b_buf_map.find(bp) == b_buf_map.end()
             && !bp->internal_buffer_p ())
           nbuffers++;
 
@@ -280,13 +353,12 @@ buffer_bar::update_ui ()
         {
           int i = 0;
           Buffer **buffers = (Buffer **)alloca (sizeof *buffers * nbuffers);
-          for (Buffer *bp = Buffer::b_blist; bp; bp = bp->b_next)
-            if (bp->b_buffer_bar_modified & Buffer::BUFFER_BAR_CREATED)
+          for (bp = Buffer::b_blist; bp; bp = bp->b_next)
+            if (b_buf_map.find(bp) == b_buf_map.end())
               {
                 if (!bp->internal_buffer_p ())
                   buffers[i++] = bp;
-                bp->b_buffer_bar_modified &= ~(Buffer::BUFFER_BAR_CREATED
-                                               | Buffer::BUFFER_BAR_MODIFIED);
+                newly_inserted[bp] = true;
               }
 
           qsort (buffers, nbuffers, sizeof *buffers, compare_buffer);
@@ -298,23 +370,25 @@ buffer_bar::update_ui ()
     }
 
   int cur = -1;
-  int mod = Buffer::b_buffer_bar_modified_any & Buffer::BUFFER_BAR_DELETED;
+  int mod = b_item_deleted;
 
-  if (Buffer::b_buffer_bar_modified_any & Buffer::BUFFER_BAR_MODIFIED
-      || b_last_buffer != selected_buffer ())
+  if (
+		b_last_checked_version != Buffer::b_last_modified_version_number
+		|| b_last_buffer != selected_buffer (b_app_frame))
     {
       for (int i = 0; i < n; i++)
         {
           Buffer *bp = nth (i);
           if (!bp)
             continue;
-          if (bp == selected_buffer ())
+          if (bp == selected_buffer (b_app_frame))
             cur = i;
-          if (bp->b_buffer_bar_modified & Buffer::BUFFER_BAR_MODIFIED)
+          if (newly_inserted.find(bp) == newly_inserted.end() &&
+			  b_last_checked_version < bp->b_modified_version)
             ;
           else if (bp->b_modified
-                   ? !(bp->b_buffer_bar_modified & Buffer::BUFFER_BAR_LAST_MODIFIED_FLAG)
-                   : bp->b_buffer_bar_modified & Buffer::BUFFER_BAR_LAST_MODIFIED_FLAG)
+                   ? !(g_modified_flag[bar_buf_pair(this, bp)] & BUFFER_BAR_LAST_MODIFIED_FLAG)
+                   : g_modified_flag[bar_buf_pair(this, bp)]  & BUFFER_BAR_LAST_MODIFIED_FLAG)
             ;
           else
             {
@@ -332,7 +406,6 @@ buffer_bar::update_ui ()
             }
           set_no_redraw ();
           mod = 1;
-          bp->b_buffer_bar_modified &= ~Buffer::BUFFER_BAR_MODIFIED;
           modify (bp, i);
         }
     }
@@ -342,7 +415,7 @@ buffer_bar::update_ui ()
   if (cur >= 1 && xsymbol_value (Vbuffer_bar_selected_buffer_to_first) != Qnil
       && GetFocus () != b_hwnd)
     {
-      Buffer *bp = selected_buffer ();
+      Buffer *bp = selected_buffer (b_app_frame);
       if (!bp->internal_buffer_p ())
         {
           set_cursel (0);
@@ -360,8 +433,11 @@ buffer_bar::update_ui ()
   if (cur >= -1)
     set_cursel (cur);
 
-  b_last_buffer = selected_buffer ();
-  Buffer::b_buffer_bar_modified_any = 0;
+  b_last_buffer = selected_buffer (b_app_frame);
+
+  b_item_deleted = false;
+  b_last_checked_version = Buffer::b_last_modified_version_number;
+
   tab_bar::update_ui ();
 }
 
@@ -394,6 +470,7 @@ buffer_bar::wndproc (UINT msg, WPARAM wparam, LPARAM lparam)
   switch (msg)
     {
     case WM_DESTROY:
+	  g_buffer_bar_map.erase(b_app_frame);
       RevokeDragDrop (b_hwnd);
       break;
 
@@ -404,15 +481,15 @@ buffer_bar::wndproc (UINT msg, WPARAM wparam, LPARAM lparam)
           KillTimer (b_hwnd, DROP_TIMER_ID);
           b_drop_index = -1;
           if (index >= 0
-              && (app.drag_window || app.kbdq.idlep ())
-              && !selected_window ()->minibuffer_window_p ())
+              && (b_app_frame->drag_window || b_app_frame->kbdq.idlep ())
+              && !selected_window (b_app_frame)->minibuffer_window_p ())
             {
               Buffer *bp = nth (index);
               if (bp)
                 {
                   try
                     {
-                      selected_buffer ()->run_hook (Vbuffer_bar_hook, bp->lbp);
+                      selected_buffer (b_app_frame)->run_hook (Vbuffer_bar_hook, bp->lbp);
                     }
                   catch (nonlocal_jump &)
                     {
@@ -466,8 +543,9 @@ buffer_bar::drag_leave ()
 lisp
 buffer_bar::buffer_list () const
 {
-  for (Buffer *bp = Buffer::b_blist; bp; bp = bp->b_next)
-    bp->b_buffer_bar_modified &= ~Buffer::BUFFER_BAR_MARK;
+  Buffer *bp;
+  buf_bool_map checked;
+
   lisp r = Qnil;
   for (int i = 0, n = item_count (); i < n; i++)
     {
@@ -475,21 +553,22 @@ buffer_bar::buffer_list () const
       if (bp)
         {
           r = xcons (bp->lbp, r);
-          bp->b_buffer_bar_modified |= Buffer::BUFFER_BAR_MARK;
+		  checked[bp] = true;
         }
     }
-  for (Buffer *bp = Buffer::b_blist; bp; bp = bp->b_next)
-    if (bp->b_buffer_bar_modified & Buffer::BUFFER_BAR_MARK)
-      bp->b_buffer_bar_modified &= ~Buffer::BUFFER_BAR_MARK;
-    else
+  for (bp = Buffer::b_blist; bp; bp = bp->b_next)
+    if (checked.find(bp) == checked.end())
       r = xcons (bp->lbp, r);
   return Fnreverse (r);
 }
 
 lisp
-Fcreate_buffer_bar ()
+Fcreate_buffer_bar (lisp frame)
 {
-  if (!buffer_bar::make_instance ())
+  ApplicationFrame* app = ApplicationFrame::coerce_to_frame(frame);
+  buffer_bar* bar = buffer_bar::make_instance(app);
+  if (bar == 0)
     FEsimple_error (ECannot_create_toolbar);
+  // what should I return?
   return Vbuffer_bar;
 }

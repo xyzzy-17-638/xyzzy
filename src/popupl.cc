@@ -77,7 +77,7 @@ wndproc (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 
         case VK_SPACE:
           if (call_callback (hwnd))
-            PostMessage (app.toplev, msg, wparam, lparam);
+            PostMessage (active_app_frame().toplev, msg, wparam, lparam);
           return 0;
 
         case VK_RETURN:
@@ -90,7 +90,7 @@ wndproc (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
           return 0;
 
         default:
-          PostMessage (app.toplev, msg, wparam, lparam);
+          PostMessage (active_app_frame().toplev, msg, wparam, lparam);
           DestroyWindow (hwnd);
           return 0;
         }
@@ -124,7 +124,7 @@ define_wndclass ()
 
   org_wndproc = wc.lpfnWndProc;
   wc.lpfnWndProc = wndproc;
-  wc.hInstance = app.hinst;
+  wc.hInstance = active_app_frame().hinst;
   wc.lpszClassName = csPopupList;
   return RegisterClass (&wc);
 }
@@ -156,7 +156,7 @@ Fpopup_list (lisp list, lisp callback, lisp lpoint)
 
   hwnd_popup = CreateWindowEx (WS_EX_DLGMODALFRAME, csPopupList, "",
                                WS_POPUP | WS_VSCROLL, 0, 0, 0, 0,
-                               app.toplev, 0, app.hinst, 0);
+                               active_app_frame().toplev, 0, active_app_frame().hinst, 0);
 
   HFONT hf = sysdep.ui_font ();
   SendMessage (hwnd_popup, WM_SETFONT, WPARAM (hf), 1);
@@ -203,11 +203,11 @@ Fpopup_list (lisp list, lisp callback, lisp lpoint)
   RECT wk;
   monitor.get_workarea_from_point (pos, &wk);
 
-  if (pos.y + app.text_font.cell ().cy + sz.cy <= wk.bottom)
-    pos.y += app.text_font.cell ().cy;
-  else if (wk.bottom - (pos.y + app.text_font.cell ().cy) > LIST_MAXH / 2)
+  if (pos.y + active_app_frame().text_font.cell ().cy + sz.cy <= wk.bottom)
+    pos.y += active_app_frame().text_font.cell ().cy;
+  else if (wk.bottom - (pos.y + active_app_frame().text_font.cell ().cy) > LIST_MAXH / 2)
     {
-      pos.y += app.text_font.cell ().cy;
+      pos.y += active_app_frame().text_font.cell ().cy;
       sz.cy = wk.bottom - pos.y;
     }
   else

@@ -97,23 +97,6 @@ copy_dir (char *b, const char *opt, const char *d)
   return copy_path (b, opt, d, 1);
 }
 
-const char *const ArchiverP::null_suffixes[] = {0};
-
-void
-ArchiverP::sepmap (char *s, int f, int t)
-{
-  while (*s)
-    {
-      u_char c = u_char (*s);
-      if (_ismbblead (c) && s[1])
-        s += 2;
-      else if (c == f)
-        *s++ = t;
-      else
-        s++;
-    }
-}
-
 int
 ArchiverP::match_suffix (const char *path, int l,
                          const char *const *list) const
@@ -125,6 +108,24 @@ ArchiverP::match_suffix (const char *path, int l,
         return 1;
     }
   return 0;
+}
+
+
+const char *const ArchiverP::null_suffixes[] = {0};
+
+void
+ArchiverPCommonArchiverImpl::sepmap (char *s, int f, int t)
+{
+  while (*s)
+    {
+      u_char c = u_char (*s);
+      if (_ismbblead (c) && s[1])
+        s += 2;
+      else if (c == f)
+        *s++ = t;
+      else
+        s++;
+    }
 }
 
 #ifdef NEED_EXTRACTINGINFO
@@ -146,18 +147,18 @@ NotifyWndProc (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
           if (*i->szDestFileName)
             {
               if (!wparam)
-                app.status_window.puts (i->szDestFileName, 1);
+                active_app_frame().status_window.puts (i->szDestFileName, 1);
               else if (wparam == 1)
                 {
                   sprintf (buf, "%s(%u/%u)...",
                            i->szDestFileName, i->dwWriteSize, i->dwFileSize);
-                  app.status_window.puts (buf, 1);
+                  active_app_frame().status_window.puts (buf, 1);
                 }
             }
           else if (wparam == 4)
             {
               sprintf (buf, "Updating %s...", i->szSourceFileName);
-              app.status_window.puts (buf, 1);
+              active_app_frame().status_window.puts (buf, 1);
             }
           if (QUITP)
             return 1;
@@ -208,7 +209,7 @@ create_notify_window (HWND parent)
 #endif /* NEED_EXTRACTINGINFO */
 
 int
-ArchiverP::doit (HWND hwnd, const char *data) const
+ArchiverPCommonArchiverImpl::doit (HWND hwnd, const char *data) const
 {
   ArchiverInterface::lock lk (ar_interface);
 #ifdef NEED_EXTRACTINGINFO
@@ -235,7 +236,7 @@ ArchiverP::doit (HWND hwnd, const char *data) const
     EnableWindow (hwnd, 1);
 
 #ifdef __XYZZY__
-  app.status_window.puts ("done", 1);
+  active_app_frame().status_window.puts ("done", 1);
 #endif
 
 #ifdef NEED_EXTRACTINGINFO
@@ -260,7 +261,7 @@ ArchiverP::doit (HWND hwnd, const char *data) const
 }
 
 int
-ArchiverP::extract (HWND hwnd, const char *data) const
+ArchiverPCommonArchiverImpl::extract (HWND hwnd, const char *data) const
 {
 #ifdef DEBUG
   printf ("Command: %s\n", data);
@@ -277,7 +278,7 @@ ArchiverP::extract (HWND hwnd, const char *data) const
 }
 
 int
-ArchiverP::extract_noresp (HWND hwnd, const char *cmd,
+ArchiverPCommonArchiverImpl::extract_noresp (HWND hwnd, const char *cmd,
                            int cmdl, const char *path) const
 {
   stdio_file fp (fopen (path, "rb"));
@@ -296,7 +297,7 @@ ArchiverP::extract_noresp (HWND hwnd, const char *cmd,
 }
 
 int
-ArchiverP::extract (HWND hwnd, const char *path, const char *destdir,
+ArchiverPCommonArchiverImpl::extract (HWND hwnd, const char *path, const char *destdir,
                     const char *dir_opt, const char *opt,
                     const char *respopt, const char *respfile) const
 {
@@ -322,7 +323,7 @@ ArchiverP::extract (HWND hwnd, const char *path, const char *destdir,
 }
 
 int
-ArchiverP::check_archive (const char *path) const
+ArchiverPCommonArchiverImpl::check_archive (const char *path) const
 {
   try
     {
@@ -335,7 +336,7 @@ ArchiverP::check_archive (const char *path) const
 }
 
 int
-ArchiverP::create (HWND hwnd, const char *path, const char *respfile,
+ArchiverPCommonArchiverImpl::create (HWND hwnd, const char *path, const char *respfile,
                    const char *respopt, const char *opt) const
 {
   int len = strlen (path) + strlen (respfile)  + strlen (opt) + 128;
@@ -353,14 +354,14 @@ ArchiverP::create (HWND hwnd, const char *path, const char *respfile,
 }
 
 int
-ArchiverP::remove (HWND hwnd, const char *path, const char *respfile,
+ArchiverPCommonArchiverImpl::remove (HWND hwnd, const char *path, const char *respfile,
                    const char *respopt, const char *opt) const
 {
   return create (hwnd, path, respfile, respopt, opt);
 }
 
 int
-ArchiverP::create_sfx (HWND hwnd, const char *path,
+ArchiverPCommonArchiverImpl::create_sfx (HWND hwnd, const char *path,
                        const char *opt1, const char *opt2) const
 {
   char *b0 = (char *)alloca (strlen (path) + strlen (opt1) + strlen (opt2) + 32);
@@ -373,7 +374,7 @@ ArchiverP::create_sfx (HWND hwnd, const char *path,
 }
 
 void
-ArchiverP::puts_extract (FILE *fp, char *name) const
+ArchiverPCommonArchiverImpl::puts_extract (FILE *fp, char *name) const
 {
   sepbacksl (name);
   putc ('"', fp);
@@ -382,7 +383,7 @@ ArchiverP::puts_extract (FILE *fp, char *name) const
 }
 
 void
-ArchiverP::puts_create (FILE *fp, char *name, const char *) const
+ArchiverPCommonArchiverImpl::puts_create (FILE *fp, char *name, const char *) const
 {
   sepbacksl (name);
   putc ('"', fp);
@@ -395,6 +396,102 @@ ArchiverP::puts_create (FILE *fp, char *name, const char *) const
   putc ('"', fp);
 }
 
+WORD
+ArchiverPCommonArchiverImpl::get_sub_version () const
+{
+  ArchiverInterface::lock lk (ar_interface);
+  return ar_interface.get_sub_version ();
+}
+
+WORD
+ArchiverPCommonArchiverImpl::get_version () const
+{
+  ArchiverInterface::lock lk (ar_interface);
+  return ar_interface.get_version ();
+}
+
+BOOL
+ArchiverPCommonArchiverImpl::config_dialog (HWND hwnd, LPSTR buf, int mode) const
+{
+  return  ar_interface.config_dialog(hwnd, buf, mode);
+}
+
+union obsolete_date
+{
+  struct
+    {
+      u_int sec: 5;
+      u_int min: 6;
+      u_int hour: 5;
+      u_int day: 5;
+      u_int mon: 4;
+      u_int year: 7;
+    } b;
+  struct
+    {
+      WORD time;
+      WORD date;
+    } w;
+};
+
+// ugh! big dup!
+lisp
+ArchiverPCommonArchiverImpl::list (const char *path, int file_name_only) const
+{
+  try
+    {
+      const ArchiverInterface &ai = ar_interface;
+      ArchiverInterface::lock lk (ai);
+      HARC harc = ai.open (0, path, 0);
+      if (!harc)
+        return 0;
+      post_open (harc);
+
+      lisp result = Qnil;
+      protect_gc gcpro (result);
+      try
+        {
+          INDIVIDUALINFO ii;
+          for (int nomore = ai.find_first (harc, match_any (), &ii);
+               !nomore; nomore = ai.find_next (harc, &ii))
+            {
+              obsolete_date d;
+              d.w.time = ii.wTime;
+              d.w.date = ii.wDate;
+              if (file_name_only)
+                result = xcons (make_string (ii.szFileName), result);
+              else
+                result = xcons (make_list
+                                (make_string (ii.szFileName),
+                                 make_string (ii.szAttribute),
+                                 make_integer (long_to_large_int (ii.dwOriginalSize)),
+                                 make_list (make_fixnum (1980 + d.b.year),
+                                            make_fixnum (d.b.mon),
+                                            make_fixnum (d.b.day),
+                                            make_fixnum (d.b.hour),
+                                            make_fixnum (d.b.min),
+                                            make_fixnum (d.b.sec * 2),
+                                            0),
+                                 0),
+                                result);
+            }
+          ai.close (harc);
+        }
+      catch (...)
+        {
+          ai.close (harc);
+          throw;
+        }
+
+      return Fnreverse (result);
+    }
+  catch (Win32Exception &)
+    {
+      return Qnil;
+    }
+}
+
+
 const char *const Ish::suffixes[] = {".ish", 0};
 
 int
@@ -403,7 +500,7 @@ Ish::extract (HWND hwnd, const char *path,
 {
   if (*respfile)
     return ERROR_NOT_SUPPORT;
-  int x = ArchiverP::extract (hwnd, path, destdir, "/f=", "/r", "", "");
+  int x = ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "/f=", "/r", "", "");
   return x == ERROR_ALREADY_EXIST ? 0 : x;
 }
 
@@ -445,12 +542,12 @@ Tar::extract (HWND hwnd, const char *path,
           dest[l - 5] = 0;
         else
           strcat (dest, ".extracted");
-        x = ArchiverP::extract (hwnd, path, destdir, "", "xfo", "", dest);
+        x = ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "", "xfo", "", dest);
       }
       break;
 
     default:
-      x = ArchiverP::extract (hwnd, path, destdir, "",
+      x = ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "",
                               *respfile ? "--check-all-path=1 -xfo" : "xfo", "@", respfile);
       break;
     }
@@ -489,7 +586,7 @@ Tar::create (HWND hwnd, const char *path, const char *respfile) const
   else
     cmd = "cf";
 #undef EQ
-  return ArchiverP::create (hwnd, path, respfile, "@", cmd);
+  return ArchiverPCommonArchiverImpl::create (hwnd, path, respfile, "@", cmd);
 }
 
 const char *const Arj::suffixes[] = {".arj", 0};
@@ -498,7 +595,7 @@ int
 Arj::extract (HWND hwnd, const char *path,
               const char *destdir, const char *respfile) const
 {
-  return ArchiverP::extract (hwnd, path, destdir, "",
+  return ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "",
                              *respfile ? "x -iup" : "x -iu", "!", respfile);
 }
 
@@ -509,7 +606,7 @@ int
 Lha::extract (HWND hwnd, const char *path,
               const char *destdir, const char *respfile) const
 {
-  return ArchiverP::extract (hwnd, path, destdir, "",
+  return ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "",
                              *respfile ? "e -a1m1nx1p1jf0" : "e -a1m1nx1jf0",
                              "@", respfile);
 }
@@ -530,19 +627,19 @@ Lha::check_archive (const char *path) const
 int
 Lha::create (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::create (hwnd, path, respfile, "@", "a -d1n");
+  return ArchiverPCommonArchiverImpl::create (hwnd, path, respfile, "@", "a -d1n");
 }
 
 int
 Lha::remove (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::remove (hwnd, path, respfile, "@", "d -p1n");
+  return ArchiverPCommonArchiverImpl::remove (hwnd, path, respfile, "@", "d -p1n");
 }
 
 int
 Lha::create_sfx (HWND hwnd, const char *path, const char *opt) const
 {
-  return ArchiverP::create_sfx (hwnd, path, "s", opt);
+  return ArchiverPCommonArchiverImpl::create_sfx (hwnd, path, "s", opt);
 }
 
 void
@@ -580,13 +677,199 @@ zip_puts (FILE *fp, const char *name)
     }
 }
 
+#include "unzip.h"
+#include <map>
+#include <string>
+using std::string;
+using std::map;
+const char *const UnzipBuiltin::esuffixes[] = {".zip", 0};
+
+static int
+parse_resp_file(map<string, bool> &targets, const char *respfile)
+{
+  stdio_file fp (fopen (respfile, "rb"));
+  if (!fp)
+    return ERROR_FILE_OPEN;
+  size_t size = _filelength (_fileno (fp));
+  safe_ptr <char> buf = new char [size + 1];
+  if (fread (buf , 1, size, fp) != size)
+    return ERROR_CANNOT_READ;
+  buf[size] = 0;
+  char *begin = buf;
+  for (char *p = buf; *p; p++)
+  {
+    if (*p == '\r' || *p == '\n')
+	{
+      // *p = ' ';
+	  string path(begin, p-begin);
+	  targets[path] = true;
+	  begin = p+1;
+	}
+  }
+  return 1;
+}
+
+static void
+notify_message(HWND notify, const char* name)
+{
+	if(notify)
+	{
+		static const UINT extract = RegisterWindowMessage (WM_ARCEXTRACT);
+		static EXTRACTINGINFO info;
+
+		ZeroMemory(&info, sizeof(EXTRACTINGINFO));
+		strcpy_s(info.szDestFileName, FNAME_MAX32+1, name);
+
+		SendMessage(notify, extract, 0, (LPARAM) &info);
+	}
+}
+
+static int
+extract_zip_builtin(HWND notify, const char *path,
+                const char *destdir, const char *respfile)
+{
+
+  map<string, bool> targets;
+  if(*respfile) 
+  {
+	 int res = parse_resp_file(targets, respfile);
+	 if(res > 0x8000)
+		 return res;
+  }
+  HZIP hz;
+  hz = OpenZip(path,0);
+  SetUnzipBaseDir(hz,destdir);
+  ZIPENTRY ze;
+  GetZipItem(hz,-1,&ze);
+  int numitems=ze.index;
+
+  for (int zi=0; zi<numitems; zi++)
+  {
+    GetZipItem(hz,zi,&ze);
+	notify_message(notify, ze.name);
+    if(targets.empty() || targets[ze.name])
+      UnzipItem(hz,zi,ze.name);
+  }
+  CloseZip(hz);
+  return 1;
+}
+
+int
+UnzipBuiltin::extract (HWND hwnd, const char *path,
+                const char *destdir, const char *respfile) const
+{
+  HWND hfocus = GetFocus ();
+  HWND notify = create_notify_window (hwnd);
+  bool enabled = hwnd && IsWindowEnabled (hwnd);
+
+  int res = extract_zip_builtin(notify, path, destdir, respfile);
+
+  if (enabled)
+    EnableWindow (hwnd, 1);
+  active_app_frame().status_window.puts ("done", 1);
+  if (notify)
+    {
+      DestroyWindow (notify);
+    }
+  if (hfocus)
+    SetFocus (hfocus);
+  return 0;
+}
+
+void
+UnzipBuiltin::puts_extract (FILE *fp, char *name) const
+{
+  zip_puts (fp, name);
+}
+
+void
+UnzipBuiltin::puts_create (FILE *fp, char *, const char*) const
+{
+	throw std::exception("unimplement, but never called");
+}
+
+int
+UnzipBuiltin::check_archive (const char *path) const
+{
+	int res = 0;
+	HZIP handle = OpenZip(path,0);
+	if(handle) {
+		res = 1;
+		CloseZip(handle);
+	}
+	return res;
+}
+
+WORD
+UnzipBuiltin::get_version () const
+{
+	return 1;
+}
+
+WORD
+UnzipBuiltin::get_sub_version () const
+{
+	return 25;
+}
+
+BOOL
+UnzipBuiltin::config_dialog (HWND hwnd, LPSTR buf, int mode) const
+{
+	return FALSE;
+}
+
+lisp
+UnzipBuiltin::list (const char *path, int file_name_only) const
+{
+    lisp result = Qnil;
+    protect_gc gcpro (result);
+
+	HZIP hz;
+	hz = OpenZip(path,0);
+	if(!hz)
+		return Qnil;
+	ZIPENTRY ze;
+	GetZipItem(hz,-1,&ze);
+	int numitems=ze.index;
+
+	for (int zi=0; zi<numitems; zi++)
+	{
+		GetZipItem(hz,zi,&ze);
+		if (file_name_only)
+			result = xcons (make_string (ze.name), result);
+		else
+		{
+			SYSTEMTIME systime;
+			FileTimeToSystemTime(&ze.ctime, &systime);
+
+			result = xcons (make_list
+							(make_string (ze.name),
+								make_string (ze.attr),
+								make_integer (long_to_large_int (ze.unc_size)),
+								make_list (make_fixnum (systime.wYear),
+								make_fixnum (systime.wMonth),
+								make_fixnum (systime.wDay),
+								make_fixnum (systime.wHour),
+								make_fixnum (systime.wMinute),
+								make_fixnum (systime.wSecond), /* why *2?  d.b.sec * 2 */
+										0),
+								0),
+							result);
+		}
+	}
+    CloseZip(hz);
+
+    return Fnreverse (result);
+}
+
+
 const char *const Unzip::esuffixes[] = {".zip", ".exe", 0};
 
 int
 Unzip::extract (HWND hwnd, const char *path,
                 const char *destdir, const char *respfile) const
 {
-  return ArchiverP::extract (hwnd, path, destdir, "", "-u --i -o", "@", respfile);
+  return ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "", "-u --i -o", "@", respfile);
 }
 
 void
@@ -602,13 +885,13 @@ const char *const Zip::csuffixes[] = {".zip", 0};
 int
 Zip::create (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::create (hwnd, path, respfile, "@", "-r -q");
+  return ArchiverPCommonArchiverImpl::create (hwnd, path, respfile, "@", "-r -q");
 }
 
 int
 Zip::remove (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::remove (hwnd, path, respfile, "@", "-d -q");
+  return ArchiverPCommonArchiverImpl::remove (hwnd, path, respfile, "@", "-d -q");
 }
 
 int
@@ -644,13 +927,13 @@ int
 Cab::extract (HWND hwnd, const char *path,
               const char *destdir, const char *respfile) const
 {
-  return ArchiverP::extract (hwnd, path, destdir, "", "-x -n -i", "@", respfile);
+  return ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "", "-x -n -i", "@", respfile);
 }
 
 int
 Cab::create (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::create (hwnd, path, respfile, "@", "-a -r");
+  return ArchiverPCommonArchiverImpl::create (hwnd, path, respfile, "@", "-a -r");
 }
 
 const char *const Unrar::esuffixes[] = {".rar", ".exe", 0};
@@ -659,7 +942,7 @@ int
 Unrar::extract (HWND hwnd, const char *path,
                 const char *destdir, const char *respfile) const
 {
-  return ArchiverP::extract (hwnd, path, destdir, "", "-x -u -s --", "@", respfile);
+  return ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "", "-x -u -s --", "@", respfile);
 }
 
 const char *const Bga::suffixes[] = {".gza", ".bza", 0};
@@ -668,20 +951,20 @@ int
 Bga::extract (HWND hwnd, const char *path,
               const char *destdir, const char *respfile) const
 {
-  return ArchiverP::extract (hwnd, path, destdir, "",
+  return ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "",
                              "x -a -i -n -r", "@", respfile);
 }
 
 int
 Bga::create (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::create (hwnd, path, respfile, "@", "a -a -i -n -r");
+  return ArchiverPCommonArchiverImpl::create (hwnd, path, respfile, "@", "a -a -i -n -r");
 }
 
 int
 Bga::remove (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::remove (hwnd, path, respfile, "@", "d -i");
+  return ArchiverPCommonArchiverImpl::remove (hwnd, path, respfile, "@", "d -i");
 }
 
 const char *const Yz1::suffixes[] = {".yz1", 0};
@@ -690,14 +973,14 @@ int
 Yz1::extract (HWND hwnd, const char *path,
               const char *destdir, const char *respfile) const
 {
-  return ArchiverP::extract (hwnd, path, destdir, "",
+  return ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "",
                              "x -i -y", 0, respfile);
 }
 
 int
 Yz1::create (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::create (hwnd, path, respfile, 0, "c -i -y");
+  return ArchiverPCommonArchiverImpl::create (hwnd, path, respfile, 0, "c -i -y");
 }
 
 const char *const UnGCA::esuffixes[] = {".gca", 0};
@@ -706,7 +989,7 @@ int
 UnGCA::extract (HWND hwnd, const char *path,
                 const char *destdir, const char *respfile) const
 {
-  return ArchiverP::extract (hwnd, path, destdir, "",
+  return ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "",
                              *respfile ? "ex -xx1 -yx1" : "e -yx1",
                              "@", respfile);
 }
@@ -717,20 +1000,20 @@ int
 SevenZip::extract (HWND hwnd, const char *path,
               const char *destdir, const char *respfile) const
 {
-  return ArchiverP::extract (hwnd, path, destdir, "",
+  return ArchiverPCommonArchiverImpl::extract (hwnd, path, destdir, "",
                              "x -hide", "@", respfile);
 }
 
 int
 SevenZip::create (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::create (hwnd, path, respfile, "@", "a -hide -ms=off");
+  return ArchiverPCommonArchiverImpl::create (hwnd, path, respfile, "@", "a -hide -ms=off");
 }
 
 int
 SevenZip::remove (HWND hwnd, const char *path, const char *respfile) const
 {
-  return ArchiverP::remove (hwnd, path, respfile, "@", "d -hide -ms=off");
+  return ArchiverPCommonArchiverImpl::remove (hwnd, path, respfile, "@", "d -hide -ms=off");
 }
 
 void
@@ -769,6 +1052,7 @@ Archiver::Archiver ()
   arcs[9] = &a_yz1;
   arcs[10] = &a_ungca;
   arcs[11] = &a_seven_zip;
+  arcs[12] = &a_unzip_bulitin; // this should be later than a_unzip.
 }
 
 const ArchiverP *
@@ -850,23 +1134,6 @@ Archiver::create_sfx (HWND hwnd, const char *path, const char *opt) const
   return ERROR_NOT_ARC_FILE;
 }
 
-union obsolete_date
-{
-  struct
-    {
-      u_int sec: 5;
-      u_int min: 6;
-      u_int hour: 5;
-      u_int day: 5;
-      u_int mon: 4;
-      u_int year: 7;
-    } b;
-  struct
-    {
-      WORD time;
-      WORD date;
-    } w;
-};
 
 lisp
 Archiver::list (const char *path, int file_name_only) const
@@ -875,57 +1142,7 @@ Archiver::list (const char *path, int file_name_only) const
   if (!ar)
     return 0;
 
-  try
-    {
-      const ArchiverInterface &ai = ar->ar_interface;
-      ArchiverInterface::lock lk (ai);
-      HARC harc = ai.open (0, path, 0);
-      if (!harc)
-        return 0;
-      ar->post_open (harc);
-
-      lisp result = Qnil;
-      protect_gc gcpro (result);
-      try
-        {
-          INDIVIDUALINFO ii;
-          for (int nomore = ai.find_first (harc, ar->match_any (), &ii);
-               !nomore; nomore = ai.find_next (harc, &ii))
-            {
-              obsolete_date d;
-              d.w.time = ii.wTime;
-              d.w.date = ii.wDate;
-              if (file_name_only)
-                result = xcons (make_string (ii.szFileName), result);
-              else
-                result = xcons (make_list
-                                (make_string (ii.szFileName),
-                                 make_string (ii.szAttribute),
-                                 make_integer (long_to_large_int (ii.dwOriginalSize)),
-                                 make_list (make_fixnum (1980 + d.b.year),
-                                            make_fixnum (d.b.mon),
-                                            make_fixnum (d.b.day),
-                                            make_fixnum (d.b.hour),
-                                            make_fixnum (d.b.min),
-                                            make_fixnum (d.b.sec * 2),
-                                            0),
-                                 0),
-                                result);
-            }
-          ai.close (harc);
-        }
-      catch (...)
-        {
-          ai.close (harc);
-          throw;
-        }
-
-      return Fnreverse (result);
-    }
-  catch (Win32Exception &)
-    {
-      return Qnil;
-    }
+  return ar->list (path, file_name_only);
 }
 
 int
@@ -933,11 +1150,10 @@ Archiver::get_version (const ArchiverP &a, char *buf)
 {
   try
     {
-      ArchiverInterface::lock lk (a.ar_interface);
-      WORD v = a.ar_interface.get_version ();
+      WORD v = a.get_version ();
       if (!v)
         return 0;
-      WORD sv = a.ar_interface.get_sub_version ();
+      WORD sv = a.get_sub_version ();
       if (sv)
         sprintf (buf, "%d.%d.%d.%d", v / 100, v % 100, sv / 100, sv % 100);
       else
@@ -957,7 +1173,7 @@ Archiver::config_dialog (const ArchiverP &a, HWND hwnd, int mode)
   *buf = 0;
   try
     {
-      return a.ar_interface.config_dialog (hwnd, buf, (mode ? PACK_CONFIG_MODE
+      return a.config_dialog (hwnd, buf, (mode ? PACK_CONFIG_MODE
                                                        : UNPACK_CONFIG_MODE)) == 1;
     }
   catch (Win32Exception &)

@@ -42,22 +42,22 @@ rowcol_from_point (Window *wp, int *xx, int *yy)
   int wincx = wp->w_ech.cx;
   if (wp->flags () & Window::WF_LINE_NUMBER)
     {
-      x -= (Window::LINENUM_COLUMNS + 1) * app.text_font.cell ().cx;
+      x -= (Window::LINENUM_COLUMNS + 1) * active_app_frame().text_font.cell ().cx;
       wincx -= Window::LINENUM_COLUMNS + 1;
     }
-  x -= app.text_font.cell ().cx / 2;
-  x -= wp->w_bufp->b_prompt_columns * app.text_font.cell ().cx; // mini buffer
+  x -= active_app_frame().text_font.cell ().cx / 2;
+  x -= wp->w_bufp->b_prompt_columns * active_app_frame().text_font.cell ().cx; // mini buffer
   wincx -= wp->w_bufp->b_prompt_columns;
 
   int oob = 0;
   if (x < 0)
     {
-      oob = oob_small (x, app.text_font.cell ().cx);
+      oob = oob_small (x, active_app_frame().text_font.cell ().cx);
       x = -1;
     }
   else
     {
-      x /= app.text_font.cell ().cx;
+      x /= active_app_frame().text_font.cell ().cx;
       if (x >= wincx)
         {
           oob = oob_large (x, wincx);
@@ -67,12 +67,12 @@ rowcol_from_point (Window *wp, int *xx, int *yy)
 
   if (y < 0)
     {
-      oob = oob_small (y, app.text_font.cell ().cy);
+      oob = oob_small (y, active_app_frame().text_font.cell ().cy);
       y = -1;
     }
   else
     {
-      y /= app.text_font.cell ().cy;
+      y /= active_app_frame().text_font.cell ().cy;
       if (y >= wp->w_ech.cy)
         {
           oob = oob_large (y, wp->w_ech.cy);
@@ -126,7 +126,7 @@ mouse_state::dispatch (Window *wp, WPARAM wparam, LPARAM lparam, int op)
       break;
 
     default:
-      if (op != MOVE || !app.toplevel_is_active)
+      if (op != MOVE || !g_app.toplevel_is_active)
         return;
       c = CCF_MOUSEMOVE;
       mouse_move_p = 1;
@@ -326,8 +326,8 @@ mouse_state::track_popup_menu (HMENU hmenu, lisp lbtn, const POINT *pt)
             Window *wp = selected_window ();
             if (!wp)
               return 0;
-            p.x = wp->caret_x () + app.text_font.cell ().cx;
-            p.y = wp->caret_y () + app.text_font.cell ().cy;
+            p.x = wp->caret_x () + active_app_frame().text_font.cell ().cx;
+            p.y = wp->caret_y () + active_app_frame().text_font.cell ().cy;
             ClientToScreen (wp->w_hwnd, &p);
             break;
           }
@@ -356,13 +356,13 @@ mouse_state::show_cursor ()
 }
 
 void
-mouse_state::hide_cursor ()
+mouse_state::hide_cursor (ApplicationFrame *app)
 {
   if (xsymbol_value (Vhide_mouse_cursor) != Qnil && !ms_hidden
-      && !app.wait_cursor_depth)
+      && !app->wait_cursor_depth)
     {
       RECT r;
-      GetWindowRect (app.toplev, &r);
+      GetWindowRect (app->toplev, &r);
       DWORD pos = GetMessagePos ();
       POINT p;
       p.x = short (LOWORD (pos));

@@ -10,8 +10,8 @@ update_column (int column, Char c)
   if (c == '\n')
     column = 0;
   else if (c == '\t')
-    column = ((column + app.default_tab_columns)
-              / app.default_tab_columns * app.default_tab_columns);
+    column = ((column + g_app.default_tab_columns)
+              / g_app.default_tab_columns * g_app.default_tab_columns);
   else
     column += char_width (c);
   return column;
@@ -33,9 +33,9 @@ update_column (int column, Char c, int size)
       if (c == '\n')
         column = 0;
       else if (c == '\t')
-        column = ((column + app.default_tab_columns) / app.default_tab_columns
-                  * app.default_tab_columns
-                  + (size - 1) * app.default_tab_columns);
+        column = ((column + g_app.default_tab_columns) / g_app.default_tab_columns
+                  * g_app.default_tab_columns
+                  + (size - 1) * g_app.default_tab_columns);
       else
         column += char_width (c) * size;
     }
@@ -1128,8 +1128,7 @@ done:
   if ((le - lb) + (re - rb) + 3 > l)
     return 0;
 
-  for (int i = 0; i < 3; i++)
-    le[i] = '.';
+  memmove(le, "...", 3);
   strcpy (le + 3, rb);
   return 1;
 }

@@ -487,7 +487,8 @@ ByteCode::xtagbody (lex_env &olex)
   dynamic_extent dyn (frame);
   lex_env nlex (olex);
 
-  for (int i = 0; i < ntags; i++)
+  int i;
+  for (i = 0; i < ntags; i++)
     {
       skip ();
       nlex.bind_frame (Qtagbody, constant (fetch ()), frame);
@@ -551,8 +552,12 @@ byte_special_bind::byte_special_bind (lisp *p, char *f, int i)
 inline
 byte_special_bind::~byte_special_bind ()
 {
-  for (int i = n - 2, j = n/2 - 1; i >= 0; i -= 2, j--)
+  assert(n%2 == 0);
+  int i = 0;
+  for (int k =0; k < n; k+=2)
     {
+      i = n-k-2;
+      int j = i/2;
       assert (symbolp (save[i]));
       if (!flags[j])
         xsymbol_flags (save[i]) &= ~SFdynamic_bind;
@@ -560,6 +565,7 @@ byte_special_bind::~byte_special_bind ()
         assert (xsymbol_flags (save[i]) & SFdynamic_bind);
       xsymbol_value (save[i]) = save[i + 1];
     }
+  assert(i == 0);
 }
 
 void

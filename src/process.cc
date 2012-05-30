@@ -225,6 +225,7 @@ Fcall_process (lisp cmd, lisp keys)
     wait = Qt;
 
   SECURITY_ATTRIBUTES sa;
+  bzero (&sa, sizeof(sa));
   sa.nLength = sizeof sa;
   sa.lpSecurityDescriptor = 0;
   sa.bInheritHandle = 1;
@@ -243,11 +244,11 @@ Fcall_process (lisp cmd, lisp keys)
   if (!no_std_handles)
     {
       si.dwFlags |= STARTF_USESTDHANDLES;
-      si.hStdInput = hin.valid () ? (HANDLE)hin : GetStdHandle (STD_INPUT_HANDLE);
-      si.hStdOutput = hout.valid () ? (HANDLE)hout : GetStdHandle (STD_OUTPUT_HANDLE);
+	  si.hStdInput = hin.valid () ? hin.get_handle() : GetStdHandle (STD_INPUT_HANDLE);
+      si.hStdOutput = hout.valid () ? hout.get_handle() :  GetStdHandle (STD_OUTPUT_HANDLE);
       si.hStdError = (lstdout != lstderr
-                      ? herr.valid () ? (HANDLE)herr : GetStdHandle (STD_ERROR_HANDLE)
-                      : hout.valid () ? (HANDLE)hout : GetStdHandle (STD_ERROR_HANDLE));
+                      ? herr.valid () ? herr.get_handle() : GetStdHandle (STD_ERROR_HANDLE)
+                      : hout.valid () ? hout.get_handle() : GetStdHandle (STD_ERROR_HANDLE));
     }
 
   WINFS::SetCurrentDirectory (dir);
@@ -322,7 +323,7 @@ protected:
   void terminated (int);
 
   void notify_term () const
-    {PostMessage (app.toplev, WM_PRIVATE_PROCESS_TERMINATE, 0, LPARAM (this));}
+    {PostMessage (active_app_frame().toplev, WM_PRIVATE_PROCESS_TERMINATE, 0, LPARAM (this));}
 
 public:
   virtual ~Process ();
@@ -330,7 +331,7 @@ public:
   virtual void signal () = 0;
   virtual void kill () = 0;
   virtual void send (const char *, int) const = 0;
-  void insert_process_output (void *);
+  void insert_process_output (ApplicationFrame *, void *);
   lisp process_buffer () const {return p_bufp->lbp;}
   void flush_input ();
   void store_output (const Char *, int);
@@ -357,7 +358,7 @@ public:
           LeaveCriticalSection (&p_cri);
           if (!empty_p)
             {
-              PostMessage (app.toplev, WM_PRIVATE_PROCESS_OUTPUT, 0, LPARAM (this));
+              PostMessage (active_app_frame().toplev, WM_PRIVATE_PROCESS_OUTPUT, 0, LPARAM (this));
               p_pending = 1;
             }
         }
@@ -428,17 +429,22 @@ Process::terminated (int exit_code)
     }
 
   p_bufp->modify_mode_line ();
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    if (wp->w_bufp == p_bufp)
-      {
-        refresh_screen (0);
-        g_frame.update_ui ();
-        break;
-      }
+  for(ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next)
+  {
+	  for (Window *wp = app1->active_frame.windows; wp; wp = wp->w_next)
+	  {
+		if (wp->w_bufp == p_bufp)
+		  {
+			refresh_screen (0);
+			app1->mframe->update_ui ();
+			break;
+		  }
+	  }
+  }
 }
 
 void
-Process::insert_process_output (void *p)
+Process::insert_process_output (ApplicationFrame *app1, void *p)
 {
   lisp lstring = 0;
   try
@@ -491,7 +497,7 @@ Process::insert_process_output (void *p)
         }
       else
         {
-          Window *wp = selected_window ();
+          Window *wp = selected_window (app1);
           if (xmarker_point (p_marker) == NO_MARK_SET)
             xmarker_point (p_marker) = p_bufp->b_contents.p2;
           int goto_tail = (wp->w_bufp == p_bufp
@@ -504,7 +510,7 @@ Process::insert_process_output (void *p)
           if (goto_tail)
             p_bufp->goto_char (wp->w_point, xmarker_point (p_marker));
           int f = 0;
-          for (wp = app.active_frame.windows; wp; wp = wp->w_next)
+          for (wp = app1->active_frame.windows; wp; wp = wp->w_next)
             if (wp->w_bufp == p_bufp)
               {
                 wp->w_disp_flags |= Window::WDF_REFRAME_SCROLL;
@@ -532,10 +538,10 @@ good_process_p (const Process *pr)
 }
 
 void
-read_process_output (WPARAM wparam, LPARAM lparam)
+read_process_output (ApplicationFrame *app1, WPARAM wparam, LPARAM lparam)
 {
   if (good_process_p ((Process *)lparam))
-    ((Process *)lparam)->insert_process_output ((void *)wparam);
+    ((Process *)lparam)->insert_process_output (app1, (void *)wparam);
 }
 
 void
@@ -556,10 +562,10 @@ Process::store_output (const Char *w, int l)
       DWORD result;
 
       do
-        if (SendMessageTimeout (app.toplev, WM_PRIVATE_PROCESS_OUTPUT,
+        if (SendMessageTimeout (active_app_frame().toplev, WM_PRIVATE_PROCESS_OUTPUT,
                                 WPARAM (&r), LPARAM (this),
                                 SMTO_NORMAL, 1000, &result)
-            || !IsWindow (app.toplev)
+            || !IsWindow (active_app_frame().toplev)
             || r.done)
           return;
       while (!p_in_send_string);
@@ -877,7 +883,8 @@ NormalProcess::create (lisp command, lisp execdir, int show, const char *env)
   if (!pipe (ipipe_r, ipipe_w, &sa))
     file_error (GetLastError ());
 
-  dyn_handle d (ipipe_w);
+  dyn_handle d;
+  ipipe_w.explicit_copy(d);
   if (!d.valid ())
     file_error (GetLastError ());
   CloseHandle (ipipe_w.unfix ());

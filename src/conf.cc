@@ -9,7 +9,7 @@
 void
 write_conf (const char *section, const char *name, const char *str)
 {
-  WritePrivateProfileString (section, name, str, app.ini_file_path);
+  WritePrivateProfileString (section, name, str, g_app.ini_file_path);
 }
 
 void
@@ -17,7 +17,7 @@ write_conf (const char *section, const char *name, long value, int hex)
 {
   char buf[32];
   sprintf (buf, hex ? "#%lx" : "%ld", value);
-  WritePrivateProfileString (section, name, buf, app.ini_file_path);
+  WritePrivateProfileString (section, name, buf, g_app.ini_file_path);
 }
 
 void
@@ -26,7 +26,7 @@ write_conf (const char *section, const char *name, const int *value, int n, int 
   char *buf = (char *)alloca (16 * n), *b = buf;
   for (int i = 0; i < n; i++)
     b += sprintf (b, hex ? ",#%x" : ",%d", *value++);
-  WritePrivateProfileString (section, name, buf + 1, app.ini_file_path);
+  WritePrivateProfileString (section, name, buf + 1, g_app.ini_file_path);
 }
 
 void
@@ -34,7 +34,7 @@ write_conf (const char *section, const char *name, const RECT &r)
 {
   char buf[128];
   sprintf (buf, "(%d,%d)-(%d,%d)", r.left, r.top, r.right, r.bottom);
-  WritePrivateProfileString (section, name, buf, app.ini_file_path);
+  WritePrivateProfileString (section, name, buf, g_app.ini_file_path);
 }
 
 void
@@ -42,7 +42,7 @@ write_conf (const char *section, const char *name, const LOGFONT &lf)
 {
   char buf[128];
   sprintf (buf, "%d,\"%s\",%d", lf.lfHeight, lf.lfFaceName, lf.lfCharSet);
-  WritePrivateProfileString (section, name, buf, app.ini_file_path);
+  WritePrivateProfileString (section, name, buf, g_app.ini_file_path);
 }
 
 void
@@ -50,7 +50,7 @@ write_conf (const char *section, const char *name, const PRLOGFONT &lf)
 {
   char buf[128];
   sprintf (buf, "%d,\"%s\",%d,%d,%d", lf.point, lf.face, lf.charset, lf.bold, lf.italic);
-  WritePrivateProfileString (section, name, buf, app.ini_file_path);
+  WritePrivateProfileString (section, name, buf, g_app.ini_file_path);
 }
 
 void
@@ -63,25 +63,25 @@ write_conf (const char *section, const char *name, const WINDOWPLACEMENT &w)
            w.rcNormalPosition.right,
            w.rcNormalPosition.bottom,
            w.showCmd);
-  WritePrivateProfileString (section, name, buf, app.ini_file_path);
+  WritePrivateProfileString (section, name, buf, g_app.ini_file_path);
 }
 
 void
 flush_conf ()
 {
-  WritePrivateProfileString (0, 0, 0, app.ini_file_path);
+  WritePrivateProfileString (0, 0, 0, g_app.ini_file_path);
 }
 
 int
 read_conf (const char *section, const char *name, char *buf, int size)
 {
-  return GetPrivateProfileString (section, name, "", buf, size, app.ini_file_path);
+  return GetPrivateProfileString (section, name, "", buf, size, g_app.ini_file_path);
 }
 
 void
 delete_conf (const char *section)
 {
-  WritePrivateProfileString (section, 0, 0, app.ini_file_path);
+  WritePrivateProfileString (section, 0, 0, g_app.ini_file_path);
 }
 
 static int
@@ -505,7 +505,8 @@ reg2ini_colors ()
   cf.type = CONF_HEX;
   char name[16];
   cf.name = name;
-  for (int i = 1; i <= 16; i++)
+  int i;
+  for (i = 1; i <= 16; i++)
     {
       sprintf (name, "%s%d", cfgFg, i);
       reg2ini_int (cfgColors, r, cf);

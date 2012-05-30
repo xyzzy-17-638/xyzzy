@@ -28,8 +28,8 @@ find_zero_bit (u_long *p, int size)
   return -1;
 }
 
-ldataP::ldataP ()
-     : ld_heap (LDATA_PAGE_SIZE), ld_rep (0), ld_freep (0)
+ldataP::ldataP (DWORD protect)
+     : ld_heap (LDATA_PAGE_SIZE, protect), ld_rep (0), ld_freep (0)
 {
 }
 
@@ -582,6 +582,7 @@ gc_mark_object (lisp object)
 
         case Trandom_state:
         case Twindow:
+		case Tappframe:
         case Tbuffer:
         case Tsyntax_table:
         case Tmarker:
@@ -776,7 +777,7 @@ gc_mark_in_stack ()
   setjmp (regs);
 
   int tem = 0;
-  lisp *beg = (lisp *)&tem, *end = (lisp *)app.initial_stack;
+  lisp *beg = (lisp *)&tem, *end = (lisp *)g_app.initial_stack;
   for (; beg < end; beg++)
     {
       lisp p = *beg;
@@ -796,6 +797,8 @@ gc_mark_in_stack ()
         gc_mark_object (p);
     }
 }
+
+extern void app_frame_gc_mark(void (*f)(lisp));
 
 void
 gc_mark_object ()
@@ -851,14 +854,8 @@ gc_mark_object ()
       gc_mark_object (lp->lex_frame);
     }
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    gc_mark_object (wp->lwp);
-  for (Window *wp = app.active_frame.reserved; wp; wp = wp->w_next)
-    gc_mark_object (wp->lwp);
-  for (Window *wp = app.active_frame.deleted; wp; wp = wp->w_next)
-    gc_mark_object (wp->lwp);
-
-  for (Buffer *bp = Buffer::b_blist; bp; bp = bp->b_next)
+  Buffer *bp;
+  for (bp = Buffer::b_blist; bp; bp = bp->b_next)
     {
       for (lisp *x = &bp->Buffer_gc_start; x <= &bp->Buffer_gc_end; x++)
         gc_mark_object (*x);
@@ -868,12 +865,11 @@ gc_mark_object ()
 
   toplev_gc_mark (gc_mark_object);
   process_gc_mark (gc_mark_object);
-  g_frame.gc_mark (gc_mark_object);
-  app.user_timer.gc_mark (gc_mark_object);
+  app_frame_gc_mark(gc_mark_object);
 
   gc_mark_in_stack ();
 
-  for (Buffer *bp = Buffer::b_blist; bp; bp = bp->b_next)
+  for (bp = Buffer::b_blist; bp; bp = bp->b_next)
     bp->lmarkers = gc_mark_list (bp->lmarkers);
 
   xsymbol_value (Vdll_module_list) =
@@ -886,14 +882,14 @@ gc (int nomsg)
   if (suppress_gc::gc_suppressed_p ())
     return;
 
-  app.in_gc = 1;
+  g_app.in_gc = 1;
 
   if (nomsg < 0)
     nomsg = xsymbol_value (Vgarbage_collection_messages) == Qnil;
 
   int msglen = 0;
   if (!nomsg)
-    msglen = app.status_window.text (get_message_string (Mgarbage_collecting));
+    msglen = active_app_frame().status_window.text (get_message_string (Mgarbage_collecting));
 
   ldataP::ld_nwasted = 0;
   gc_mark_object ();
@@ -914,13 +910,13 @@ gc (int nomsg)
   if (!nomsg)
     {
       if (msglen)
-        app.status_window.restore ();
+        active_app_frame().status_window.restore ();
       else
-        app.status_window.text (get_message_string (Mgarbage_collecting_done));
+        active_app_frame().status_window.text (get_message_string (Mgarbage_collecting_done));
     }
 
   _heapmin ();
-  app.in_gc = 0;
+  g_app.in_gc = 0;
 }
 
 lisp
@@ -967,7 +963,11 @@ char *ldataP::ld_upper_bound;
 char *ldataP::ld_lower_bound;
 
 #define DECLARE_LDATA(a, b) \
-  ldataP ldata <a, b>::l_ld; \
+  ldataP ldata <a, b>::l_ld(PAGE_READWRITE); \
+  int ldata <a, b>::l_nuses; \
+  int ldata <a, b>::l_nfrees;
+#define DECLARE_LDATAX(a, b) \
+  ldataP ldata <a, b>::l_ld(PAGE_EXECUTE_READWRITE); \
   int ldata <a, b>::l_nuses; \
   int ldata <a, b>::l_nfrees;
 #include "dataP.h"
@@ -2123,6 +2123,22 @@ rdump_object (FILE *fp, lwindow *d, int n,
 }
 
 static inline void
+dump_object (FILE *, const lappframe *, int,
+             const u_long [LDATA_MAX_OBJECTS_PER_LONG])
+{
+}
+
+static void
+rdump_object (FILE *fp, lappframe *d, int n,
+              const u_long used[LDATA_MAX_OBJECTS_PER_LONG])
+{
+  for (lappframe *de = d + n; d < de; d++)
+    if (bitisset (used, bit_index (d)))
+      d->fp = 0;
+}
+
+
+static inline void
 dump_object (FILE *, const lbuffer *, int,
              const u_long [LDATA_MAX_OBJECTS_PER_LONG])
 {
@@ -2695,7 +2711,7 @@ Fdump_xyzzy (lisp filename)
   if (!filename || filename == Qnil)
     {
       filename = xsymbol_value (Qdump_image_path);
-      path = app.dump_image;
+	  path = g_app.dump_image;
     }
   else
     {
@@ -2807,12 +2823,12 @@ rdump_xyzzy (FILE *fp)
   return 1;
 }
 
-static int dump_flag;
+static int dump_flag = 0;
 
 int
 rdump_xyzzy ()
 {
-  FILE *fp = _fsopen (app.dump_image, "rb", _SH_DENYWR);
+  FILE *fp = _fsopen (g_app.dump_image, "rb", _SH_DENYWR);
   if (!fp)
     return 0;
 

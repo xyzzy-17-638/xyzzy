@@ -7,32 +7,65 @@
 
 (in-package "editor")
 
-(export '(*app-menu* *app-popup-menu* *menu-history-max*
-	  *app-rectangle-popup-menu* *clipboard-char-encoding-popup-menu*
-	  *dictionary-popup-menu* *paste-rectangle-popup-menu*
-	  *command-bar-popup-menu*
+(export '(*menu-history-max*
+	  generate-hash-accessor
+	  get-command-bar-popup-menu set-command-bar-popup-menu
+	  get-app-rectangle-popup-menu set-app-rectangle-popup-menu
+	  get-app-menu set-app-menu 
+	  get-app-popup-menu set-app-popup-menu
+  	  get-clipboard-char-encoding-popup-menu set-clipboard-char-encoding-popup-menu
+  	  get-dictionary-popup-menu set-dictionary-popup-menu
+  	  get-paste-rectangle-popup-menu set-paste-rectangle-popup-menu
 	  make-char-encoding-popup-menu
 	  add-file-history-to-menu *menu-display-length*
 	  *init-app-menus-hook*))
 
-(defvar *app-menu* nil)
-(defvar *app-popup-menu* nil)
-(defvar *app-rectangle-popup-menu* nil)
-(defvar *clipboard-char-encoding-popup-menu* nil)
-(defvar *dictionary-popup-menu* nil)
-(defvar *paste-rectangle-popup-menu* nil)
-(defvar *command-bar-popup-menu* nil)
+(defvar *app-menu* (make-hash-table))
+(defvar *app-popup-menu* (make-hash-table))
+(defvar *app-rectangle-popup-menu* (make-hash-table))
+(defvar *clipboard-char-encoding-popup-menu* (make-hash-table))
+(defvar *dictionary-popup-menu* (make-hash-table))
+(defvar *paste-rectangle-popup-menu* (make-hash-table))
+(defvar *command-bar-popup-menu* (make-hash-table))
 
-(defvar *recent-file-popup-menu* nil)
-(defvar *recent-session-popup-menu* nil)
+(defvar *recent-file-popup-menu* (make-hash-table))
+(defvar *recent-session-popup-menu* (make-hash-table))
 
 (defvar *menu-history-max* 9)
 
 (defvar *init-app-menus-hook* nil)
 
-(defun init-app-menus ()
+(defun set-menu-to-frame-hash(frame hash menu)
+  (si:*puthash frame hash menu)) 
 
-  (setq *clipboard-char-encoding-popup-menu*
+(defun get-menu-from-frame-hash(frame hash)
+  (gethash frame hash)) 
+
+(defmacro generate-hash-accessor(name)
+  "ex. (generate-hash-accessor recent-file-popup-menu) will generate
+     get-recent-file-popup-menu and set-recent-file-popup-menu for *recent-file-popup-menu*"
+  (let ((getter (intern (concat "get-" (symbol-name name))))
+	(setter (intern (concat "set-" (symbol-name name))))
+	(varname (intern (concat "*" (symbol-name name) "*"))))
+    `(progn
+       (defun ,getter (frame)
+	 (get-menu-from-frame-hash frame ,varname))
+       (defun ,setter (frame menu)
+	 (set-menu-to-frame-hash frame ,varname menu)))))
+
+(generate-hash-accessor app-menu)
+(generate-hash-accessor app-popup-menu)
+(generate-hash-accessor app-rectangle-popup-menu)
+(generate-hash-accessor dictionary-popup-menu)
+(generate-hash-accessor paste-rectangle-popup-menu)
+(generate-hash-accessor command-bar-popup-menu)
+(generate-hash-accessor clipboard-char-encoding-popup-menu)
+(generate-hash-accessor recent-file-popup-menu)
+(generate-hash-accessor recent-session-popup-menu)
+
+
+(defun init-menu-handle(frame)
+  (set-clipboard-char-encoding-popup-menu frame
 	(make-char-encoding-popup-menu
 	 #'(lambda (encoding)
 	     (interactive)
@@ -42,7 +75,7 @@
 	     (and (eq *clipboard-char-encoding* encoding) :check))
 	 *clipboard-char-encoding-list*))
 
-  (setq *dictionary-popup-menu*
+  (set-dictionary-popup-menu frame
 	(define-popup-menu ':dictionary-popup
 	  (:item :tag-command "和英(&J)"
 	   'lookup-j2e-dictionary-selection)
@@ -57,7 +90,7 @@
 	   'edict-mode
 	   #'(lambda () (if edict-mode :check)))))
 
-  (setq *paste-rectangle-popup-menu*
+  (set-paste-rectangle-popup-menu frame
 	(define-popup-menu ':paste-rectangle-popup
 	  (:item :tag-command "挿入(&I)"
 	   'yank-rectangle
@@ -72,7 +105,7 @@
 	   'yank-rectangle-as-region
 	   #'(lambda () (unless *rectangle-kill-buffer* :disable)))))
 
-  (setq *app-popup-menu*
+  (set-app-popup-menu frame
 	(define-popup-menu
 	  (:item :tag-command "切り取り(&T)"
 	   'kill-selection-to-clipboard :modify-any-selection)
@@ -83,25 +116,25 @@
 	  (:item :tag-command "貼り付け - 矩形(&G)"
 	   'paste-rectangle-from-clipboard :clipboard)
 	  (:menu nil "クリップボードエンコーディング(&E)"
-	   *clipboard-char-encoding-popup-menu*)
+	   (get-clipboard-char-encoding-popup-menu frame))
 	  (:item :tag-command "削除(&D)"
 	   'delete-selection :modify-any-selection)
 	  (:item :tag-command "全てを選択(&A)"
 	   'selection-whole-buffer)
 	  (:sep :above-dictionary-popup-menu)
 	  (:menu nil "辞書(&I)"
-	   *dictionary-popup-menu*)
+	   (get-dictionary-popup-menu frame))
 	  (:menu nil "矩形貼り付け(&R)"
-	   *paste-rectangle-popup-menu*)))
+	   (get-paste-rectangle-popup-menu frame))))
 
-  (setq *app-rectangle-popup-menu*
+  (set-app-rectangle-popup-menu frame
 	(define-popup-menu
 	  (:item :tag-command "切り取り(&T)"
 	   'kill-rectangle-selection :modify-rectangle)
 	  (:item :tag-command "コピー(&C)"
 	   'copy-rectangle-selection :rectangle)
 	  (:menu nil "貼り付け(&P)"
-	   *paste-rectangle-popup-menu*)
+	   (get-paste-rectangle-popup-menu frame))
 	  (:item :tag-command "削除(&D)"
 	   'delete-rectangle-selection :modify-rectangle)
 	  (:item :tag-command "クリア(&R)"
@@ -111,15 +144,14 @@
 	  (:item :tag-command "文字列で置き換え(&S)"
 	   'string-rectangle-selection :modify-rectangle)))
 
-  (or *command-bar-popup-menu*
-      (setq *command-bar-popup-menu* (create-popup-menu ':command-bar-popup)))
+  (or (get-command-bar-popup-menu frame)
+      (set-command-bar-popup-menu frame (create-popup-menu ':command-bar-popup)))
 
-  (or *recent-file-popup-menu*
-      (setq *recent-file-popup-menu* (create-popup-menu ':recent-file-popup)))
-  (or *recent-session-popup-menu*
-      (setq *recent-session-popup-menu* (create-popup-menu ':recent-session-popup)))
-
-  (setq *app-menu*
+  (or (get-recent-file-popup-menu frame)
+      (set-recent-file-popup-menu frame (create-popup-menu ':recent-file-popup)))
+  (or (get-recent-session-popup-menu frame)
+      (set-recent-session-popup-menu frame (create-popup-menu ':recent-session-popup)))
+  (set-app-menu frame
 	(define-menu
 	  (:popup 'file "ファイル(&F)"
 	   (:item :tag-command "新規作成(&N)"
@@ -155,9 +187,9 @@
 	    'print-selected-buffer-dialog)
 	   (:sep :above-recent)
 	   (:menu nil "最近使ったファイル(&F)"
-	    *recent-file-popup-menu*)
+	    (get-recent-file-popup-menu frame))
 	   (:menu nil "最近使ったセッション(&L)"
-	    *recent-session-popup-menu*)
+	    (get-recent-session-popup-menu frame))
 	   (:sep :above-kill-xyzzy)
 	   (:item :tag-command "保存して終了(&E)"
 	    'save-all-buffers-kill-xyzzy)
@@ -178,14 +210,14 @@
 	   (:item :tag-command "貼り付け - 矩形(&G)"
 	    'paste-rectangle-from-clipboard :clipboard)
 	   (:menu nil "クリップボードエンコーディング(&E)"
-	    *clipboard-char-encoding-popup-menu*)
+	    (get-clipboard-char-encoding-popup-menu frame))
 	   (:item :tag-command "削除(&L)"
 	    'delete-selection :modify-any-selection)
 	   (:item :tag-command "全てを選択(&S)"
 	    'selection-whole-buffer)
 	   (:sep :above-rectangle)
 	   (:menu nil "矩形(&N)"
-	    *app-rectangle-popup-menu*)
+	    (get-app-rectangle-popup-menu frame))
 	   (:popup :convert-popup "変換(&V)"
 	    (:item :tag-command "大文字(&U)"
 	     'upcase-selection :selection)
@@ -309,7 +341,7 @@
 	    'set-buffer-fold-type-window
 	    'set-buffer-fold-type-window-update)
 	   (:sep :above-command-bar)
-	   (:menu nil "ツールバー(&Q)" *command-bar-popup-menu*)
+	   (:menu nil "ツールバー(&Q)" (get-command-bar-popup-menu frame))
 	   (:sep :above-font-size)
 	   (:popup nil "文字のサイズ(&X)"
 	    (:item :tag-command "文字を大きく(&I)"
@@ -427,7 +459,7 @@
 	   (:item :tag-command "ファイラ(&F)..."
 	    'open-filer)
 	   (:menu nil "辞書(&I)"
-	    *dictionary-popup-menu*)
+	    (get-dictionary-popup-menu frame))
 	   (:sep :above-make-tags)
 	   (:item :tag-command "TAGSファイルの作成(&G)..."
 	    'make-tags-file-dialog)
@@ -440,6 +472,9 @@
 	   (:item :tag-command "バックタグジャンプ(&B)"
 	    'back-tag-jump
 	    #'(lambda () (if (null *global-mark-list*) :disable)))
+	   (:sep :above-check-update)
+	   (:item :tag-command "アップデートの確認"
+	    'check-update)
 	   (:sep :|above-(>_<)|)
 	   (:popup :|(>_<)-popup| "(>&_<)"
 	    (:item :tag-command "ニフティのログを読む(&N)"
@@ -472,10 +507,14 @@
 	  (:item 'close "閉じる(&C)"
 	   #'(lambda ()
 	       (interactive)
-	       (kill-buffer *buffer-bar-context-menu-buffer*)))))
+	       (kill-buffer *buffer-bar-context-menu-buffer*))))))
 
+  
+
+(defun init-app-menus (&optional (frame (selected-frame)))
+  (init-menu-handle frame)
   (run-hooks '*init-app-menus-hook*)
-  (set-menu *app-menu*)
+  (set-menu (get-app-menu frame) frame)
   (add-file-history-to-menu)
   (add-session-history-to-menu))
 
@@ -562,11 +601,13 @@
 	(incf count)))))
 
 (defun add-file-history-to-menu ()
-  (when (menup *app-menu*)
-    (add-lru-menu *recent-file-popup-menu*
-		  *minibuffer-file-name-history*
-		  #'(lambda (filename)
-		      #'(lambda ()
-			  (interactive)
-			  (find-file filename)
-			  (add-history filename '*minibuffer-file-name-history*))))))
+  (dolist (frame (frame-list))
+    (when (menup (get-app-menu frame))
+      (add-lru-menu (get-recent-file-popup-menu frame)
+		    *minibuffer-file-name-history*
+		    #'(lambda (filename)
+			#'(lambda ()
+			    (interactive)
+			    (find-file filename)
+			    (add-history filename '*minibuffer-file-name-history*)))))))
+  

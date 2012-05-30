@@ -2488,7 +2488,11 @@ int
 Regexp::search (const Char *string, int size, int offset)
 {
   Chunk chunk;
-  chunk.c_used = size;
+
+  if(size >= 0x8000)
+	  chunk.c_used = Chunk::SPECIAL;
+  else
+	  chunk.c_used = size;
   chunk.c_text = (Char *)string;
   chunk.c_prev = 0;
   chunk.c_next = 0;

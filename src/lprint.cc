@@ -235,6 +235,7 @@ print_circle::setup1 (lisp object)
         case Tdouble_float:
         case Tcomplex:
         case Twindow:
+		case Tappframe:
         case Tbuffer:
         case Tmarker:
         case Tsyntax_table:
@@ -1471,6 +1472,12 @@ print_window (wStream &stream, const print_control &, lisp object)
   print_unreadable_object (stream, object, "window");
 }
 
+static inline void
+print_appframe (wStream &stream, const print_control &, lisp object)
+{
+  print_unreadable_object (stream, object, "appframe");
+}
+
 static void
 print_buffer_name (wStream &stream, const Buffer *bp)
 {
@@ -1745,6 +1752,10 @@ print_sexp (wStream &stream, const print_control &pc, lisp object, int level)
         case Twindow:
           print_window (stream, pc, object);
           break;
+
+		case Tappframe:
+		  print_appframe(stream, pc, object);
+		  break;
 
         case Tbuffer:
           print_buffer (stream, pc, object);
@@ -3972,13 +3983,13 @@ putmsg (wStream &stream, int msgboxp, int style, int beep)
   if (msgboxp)
     {
       w2s ((char *)b, b + 1, l);
-      app.status_window.clear ();
+      active_app_frame().status_window.clear ();
       return MsgBox (get_active_window (), (char *)b, TitleBarString, style, beep);
     }
   else
     {
-      app.status_window.puts (b + 1, l);
-      app.status_window.putc ('\n');
+      active_app_frame().status_window.puts (b + 1, l);
+      active_app_frame().status_window.putc ('\n');
       if (beep)
         Fding ();
       return 0;
@@ -4063,7 +4074,12 @@ print_condition (lisp cc)
       || Fsi_structure_subtypep (xstrdata_def (cc),
                                  xsymbol_value (QCcondition)) == Qnil)
     {
-      assert (0);
+	  /*
+	  From ByteCode::xthrow, cc (nld->id) becomes Qnil and comming here.
+	  I'm sure this should not be assert fail, but I don't know the original intention.
+	  So leave original code as comment.
+	  */
+      // assert (0);
       return;
     }
 
@@ -4318,7 +4334,7 @@ format_message (message_code m, ...)
   char buf[2048];
   vsprintf (buf, fmt, ap);
   va_end (ap);
-  app.status_window.puts (buf, 1);
+  active_app_frame().status_window.puts (buf, 1);
 }
 
 int

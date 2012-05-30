@@ -164,12 +164,12 @@ FontSet::paint_newline_bitmap (HDC hdc)
   int h = fs_size.cy / 2;
   int y0 = fs_size.cy - 2;
   int ox = fs_cell.cx * newline + 2;
-  int y;
+  int y, x = 0;
   for (y = 0; y < h; y++)
     SetPixel (hdc, ox, y0 - y, RGB (0, 0, 0));
   for (y = 0; y < h / 2 - 1; y++)
     SetPixel (hdc, ox + y, y0 - y, RGB (0, 0, 0));
-  int w, x;
+  int w;
   for (w = (y + 1) / 2, x = y; x >= w; x--)
     SetPixel (hdc, ox + x, y0 - y, RGB (0, 0, 0));
   for (x++; y < h; y++)
@@ -296,12 +296,13 @@ FontSet::paint_fold_bitmap (HDC hdc)
   ExtTextOut (hdc, m1 + f.offset ().x, f.offset ().y, 0, 0, &c, 1, 0);
   SelectObject (hdc, of);
 
-  for (int y = 0; y < fs_cell.cy; y += 2)
+  int y;
+  for (y = 0; y < fs_cell.cy; y += 2)
     {
       SetPixel (hdc, s0, y, RGB (0, 0, 0));
       SetPixel (hdc, m0, y, RGB (0, 0, 0));
     }
-  for (int y = fs_cell.cy & 1; y < fs_cell.cy; y += 2)
+  for (y = fs_cell.cy & 1; y < fs_cell.cy; y += 2)
     {
       SetPixel (hdc, s1, y, RGB (0, 0, 0));
       SetPixel (hdc, m1, y, RGB (0, 0, 0));
@@ -346,10 +347,11 @@ FontSet::create (const FontSetParam &param)
 
   if (!fs_recommend_size)
     {
-      for (int i = 0; i < FONT_MAX; i++)
+	  int i;
+      for (i = 0; i < FONT_MAX; i++)
         fs_font[i].create (param.fs_logfont[i]);
 
-      for (int i = 0; i < FONT_MAX; i++)
+      for (i = 0; i < FONT_MAX; i++)
         fs_font[i].get_metrics (hdc, ex[i][0], ex[i][1]);
     }
   else
@@ -372,7 +374,8 @@ FontSet::create (const FontSetParam &param)
 
   fs_size = fs_font[FONT_ASCII].size ();
 
-  for (int i = 0; i < FONT_MAX; i++)
+  int i ;
+  for (i = 0; i < FONT_MAX; i++)
     if (fs_font[i].size ().cx > fs_size.cx)
       {
         LOGFONT lf (param.fs_logfont[i]);
@@ -391,7 +394,7 @@ FontSet::create (const FontSetParam &param)
     fs_line_width = 1;
 
   fs_need_pad = 0;
-  for (int i = 0; i < FONT_MAX; i++)
+  for (i = 0; i < FONT_MAX; i++)
     {
       fs_font[i].calc_offset (fs_size);
       if (fs_font[i].size ().cx != fs_size.cx
@@ -443,11 +446,12 @@ FontSet::load_params (FontSetParam &param)
     param.fs_recommend_size = 0;
   if (!read_conf (cfgFont, cfgSizePixel, param.fs_size_pixel))
     param.fs_size_pixel = 0;
-  for (int i = 0; i < FONT_MAX; i++)
+  int i;
+  for (i = 0; i < FONT_MAX; i++)
     if (!read_conf (cfgFont, regent (i), param.fs_logfont[i]))
       *param.fs_logfont[i].lfFaceName = 0;
 
-  for (int i = 0; i < FONT_MAX; i++)
+  for (i = 0; i < FONT_MAX; i++)
     {
       if (!*param.fs_logfont[i].lfFaceName)
         {
@@ -532,7 +536,7 @@ FontSet::update (FontSetParam &param, const lisp lfontset) const
 lisp
 Fget_text_fontset ()
 {
-  return app.text_font.make_alist ();
+  return active_app_frame().text_font.make_alist ();
 }
 
 lisp
@@ -541,7 +545,7 @@ Fset_text_fontset (lisp lfontset)
   check_cons (lfontset);
 
   FontSetParam param;
-  if (!app.text_font.update (param, lfontset))
+  if (!active_app_frame().text_font.update (param, lfontset))
     return Qnil;
 
   Window::change_parameters (param);

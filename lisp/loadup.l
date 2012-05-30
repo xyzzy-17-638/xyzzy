@@ -72,6 +72,7 @@
 (si:*load-library "boxdraw") (gc)
 (si:*load-library "cmdbar") (gc)
 (si:*load-library "pframe") (gc)
+(si:*load-library "frame") (gc)
 (si:*load-library "session") (gc)
 (si:*load-library "about") (gc)
 (si:*load-library "common-lisp") (gc)

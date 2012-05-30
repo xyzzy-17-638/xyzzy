@@ -134,7 +134,7 @@ calc_caret_shape (SIZE &size, int ovwrt, int dbcp, int selection)
   if (selection)
     {
       size.cx = 2 * sysdep.border.cx;
-      size.cy = app.text_font.size ().cy;
+      size.cy = active_app_frame().text_font.size ().cy;
     }
   else
     {
@@ -150,16 +150,16 @@ calc_caret_shape (SIZE &size, int ovwrt, int dbcp, int selection)
         {
         case CARET_SHAPE_THIN:
           size.cx = 2 * sysdep.border.cx;
-          size.cy = app.text_font.size ().cy;
+          size.cy = active_app_frame().text_font.size ().cy;
           break;
 
         default:
         case CARET_SHAPE_BLOCK:
-          size.cy = app.text_font.size ().cy;
+          size.cy = active_app_frame().text_font.size ().cy;
           goto width;
 
         case CARET_SHAPE_HALF:
-          size.cy = app.text_font.size ().cy / 2;
+          size.cy = active_app_frame().text_font.size ().cy / 2;
           goto width;
 
         case CARET_SHAPE_UNDERLINE:
@@ -167,7 +167,7 @@ calc_caret_shape (SIZE &size, int ovwrt, int dbcp, int selection)
           goto width;
 
         width:
-          size.cx = app.text_font.cell ().cx;
+          size.cx = active_app_frame().text_font.cell ().cx;
           if (dbcp)
             size.cx *= 2;
           break;
@@ -190,86 +190,86 @@ Window::caret_size (SIZE &size) const
                                  && w_point.p_point < w_selection_marker)
                               : (w_point.p_point >= w_selection_marker
                                  && w_point.p_point < w_selection_point))))
-                     || app.f_in_drop));
+                     || w_owner->f_in_drop));
 }
 
 void
 Window::hide_caret () const
 {
-  if (app.active_frame.has_caret == w_hwnd && app.active_frame.caret_on)
+  if (w_owner->active_frame.has_caret == w_hwnd && w_owner->active_frame.caret_on)
     {
       HideCaret (w_hwnd);
-      app.active_frame.caret_on = 0;
+      w_owner->active_frame.caret_on = 0;
     }
 }
 
 void
-Window::delete_caret ()
+Window::delete_caret (ApplicationFrame *app1)
 {
-  if (app.active_frame.has_caret)
+  if (app1->active_frame.has_caret)
     {
       xcaret.destroy ();
-      app.active_frame.caret_on = 0;
-      app.active_frame.has_caret = 0;
+      app1->active_frame.caret_on = 0;
+      app1->active_frame.has_caret = 0;
     }
 }
 
 void
-Window::update_last_caret ()
+Window::update_last_caret (ApplicationFrame *owner)
 {
-  if (app.active_frame.windows)
+  if (owner->active_frame.windows)
     {
-      if (selected_window ())
-        selected_window ()->update_caret ();
-      Window *mini = Window::minibuffer_window ();
-      if (mini && mini != selected_window ())
+      if (selected_window (owner))
+        selected_window (owner)->update_caret ();
+      Window *mini = Window::minibuffer_window (owner);
+      if (mini && mini != selected_window (owner))
         mini->update_caret ();
     }
 }
 
 void
-Window::update_caret (HWND hwnd, int x, int y, int w, int h, COLORREF cc)
+Window::update_caret (ApplicationFrame *app1, HWND hwnd, int x, int y, int w, int h, COLORREF cc)
 {
-  int gray_caret = app.f_in_drop;
-  if (!app.ime_composition
-      && app.last_blink_caret != (xsymbol_value (Vblink_caret) != Qnil))
+  int gray_caret = app1->f_in_drop;
+  if (!app1->ime_composition
+      && app1->last_blink_caret != (xsymbol_value (Vblink_caret) != Qnil))
     {
-      app.last_blink_caret = xsymbol_value (Vblink_caret) != Qnil;
-      if (app.last_blink_caret)
-        restore_caret_blink_time ();
+      app1->last_blink_caret = xsymbol_value (Vblink_caret) != Qnil;
+      if (app1->last_blink_caret)
+        restore_caret_blink_time (app1);
       else
-        set_caret_blink_time ();
+        set_caret_blink_time (app1);
     }
-  if (!app.active_frame.has_caret)
+  if (!app1->active_frame.has_caret)
     {
-      app.active_frame.has_caret = hwnd;
+      app1->active_frame.has_caret = hwnd;
       xcaret.create (hwnd, gray_caret ? HBITMAP (1) : 0, w, h, cc);
       ShowCaret (hwnd);
     }
-  else if (app.active_frame.has_caret != hwnd
-           || w != app.active_frame.caret_size.cx
-           || h != app.active_frame.caret_size.cy
-           || cc != app.active_frame.last_caret_color
-           || app.active_frame.gray_caret != gray_caret)
+  else if (app1->active_frame.has_caret != hwnd
+           || w != app1->active_frame.caret_size.cx
+           || h != app1->active_frame.caret_size.cy
+           || cc != app1->active_frame.last_caret_color
+           || app1->active_frame.gray_caret != gray_caret)
     {
-      app.active_frame.has_caret = hwnd;
+      app1->active_frame.has_caret = hwnd;
       xcaret.destroy ();
       xcaret.create (hwnd, gray_caret ? HBITMAP (1) : 0, w, h, cc);
       ShowCaret (hwnd);
     }
-  else if (!app.active_frame.caret_on)
+  else if (!app1->active_frame.caret_on)
     ShowCaret (hwnd);
-  app.active_frame.has_caret_last = hwnd;
-  app.active_frame.last_caret_color = cc;
-  app.active_frame.caret_on = 1;
-  app.active_frame.caret_size.cx = w;
-  app.active_frame.caret_size.cy = h;
-  app.active_frame.caret_pos.x = x;
-  app.active_frame.caret_pos.y = y;
-  app.active_frame.gray_caret = gray_caret;
-  SetCaretPos (app.active_frame.caret_pos.x,
-               app.active_frame.caret_pos.y + app.text_font.size ().cy - h);
-  set_ime_caret ();
+  app1->active_frame.has_caret_last = hwnd;
+  app1->active_frame.last_caret_color = cc;
+  app1->active_frame.caret_on = 1;
+  app1->active_frame.caret_size.cx = w;
+  app1->active_frame.caret_size.cy = h;
+  app1->active_frame.caret_pos.x = x;
+  app1->active_frame.caret_pos.y = y;
+  app1->active_frame.gray_caret = gray_caret;
+  SetCaretPos (app1->active_frame.caret_pos.x,
+               app1->active_frame.caret_pos.y + app1->text_font.size ().cy - h);
+  set_ime_caret (app1);
 }
 
 void
@@ -277,28 +277,28 @@ Window::update_caret () const
 {
   int show, prompt = 0;
 
-  if (app.f_in_drop)
-    show = w_bufp && app.drop_window == this;
-  else if (!app.active_frame.has_focus)
+  if (w_owner->f_in_drop)
+    show = w_bufp && w_owner->drop_window == this;
+  else if (!w_owner->active_frame.has_focus)
     show = 0;
-  else if (stringp (xsymbol_value (Vminibuffer_message))
-           && xsymbol_value (Vminibuffer_prompt) != Qnil
-           && app.minibuffer_prompt_column >= 0)
+  else if (stringp (w_owner->lminibuffer_message)
+           && w_owner->lminibuffer_prompt != Qnil
+           && w_owner->minibuffer_prompt_column >= 0)
     {
       show = minibuffer_window_p ();
       prompt = 1;
     }
   else
-    show = w_bufp && selected_window () == this;
+    show = w_bufp && selected_window (w_owner) == this;
 
   if (!show)
     {
-      if (app.active_frame.has_caret == w_hwnd)
-        delete_caret ();
+      if (w_owner->active_frame.has_caret == w_hwnd)
+        delete_caret (w_owner);
     }
   else
     {
-      COLORREF cc = (app.ime_open_mode == kbd_queue::IME_MODE_ON
+      COLORREF cc = (w_owner->ime_open_mode == kbd_queue::IME_MODE_ON
                      ? w_colors[WCOLOR_IMECARET]
                      : w_colors[WCOLOR_CARET]);
       COLORREF bg = w_colors[WCOLOR_BACK];
@@ -307,7 +307,7 @@ Window::update_caret () const
       if (prompt)
         {
           calc_caret_shape (sz, 0, 0, 0);
-          x = app.minibuffer_prompt_column - 1;
+          x = w_owner->minibuffer_prompt_column - 1;
           y = 0;
         }
       else
@@ -341,7 +341,7 @@ Window::update_caret () const
       cc = GetNearestColor (hdc, cc);
       ReleaseDC (w_hwnd, hdc);
 
-      update_caret (w_hwnd, caret_xpixel (x), caret_ypixel (y),
+      update_caret (w_owner, w_hwnd, caret_xpixel (x), caret_ypixel (y),
                     sz.cx, sz.cy, cc);
     }
 }
@@ -354,7 +354,7 @@ class paint_chars_ctx
   const int p_cellw;
 public:
   paint_chars_ctx (int x, int y, const RECT &r, int w)
-       : p_x (x), p_y (y), p_cellw (w * app.text_font.cell ().cx)
+       : p_x (x), p_y (y), p_cellw (w * active_app_frame().text_font.cell ().cx)
     {
       p_r.left = r.left;
       p_r.top = r.top;
@@ -364,7 +364,7 @@ public:
   void paint (HDC hdc, ucs2_t wc, int flags)
     {
       p_r.right = min (int (p_r.left + p_cellw), p_right);
-      ExtTextOutW (hdc, p_x, p_y, flags, &p_r, &wc, 1, 0);
+      ExtTextOutW (hdc, p_x, p_y, flags, &p_r, (LPCWSTR)&wc, 1, 0);
       p_r.left = p_r.right;
       p_x += p_cellw;
     }
@@ -374,11 +374,11 @@ public:
 void
 paint_chars_ctx::paint_lucida (HDC hdc, ucs2_t wc, int flags)
 {
-  const FontObject &f = app.text_font.font (FONT_ASCII);
+  const FontObject &f = active_app_frame().text_font.font (FONT_ASCII);
   int o = (LUCIDA_OFFSET (wc - UNICODE_SMLCDM_MIN) * f.size ().cy / LUCIDA_BASE_HEIGHT
-           + app.text_font.cell ().cx / 2);
+           + active_app_frame().text_font.cell ().cx / 2);
   p_r.right = min (int (p_r.left + p_cellw), p_right);
-  ExtTextOutW (hdc, p_x + o, p_y, flags, &p_r, &wc, 1, 0);
+  ExtTextOutW (hdc, p_x + o, p_y, flags, &p_r, (LPCWSTR)&wc, 1, 0);
   p_r.left = p_r.right;
   p_x += p_cellw;
 }
@@ -387,7 +387,7 @@ static inline void
 paint_ascii_chars (HDC hdc, int x, int y, int flags, const RECT &r,
                    const char *string, int len, const INT *padding)
 {
-  const FontObject &f = app.text_font.font (FONT_ASCII);
+  const FontObject &f = active_app_frame().text_font.font (FONT_ASCII);
   ExtTextOut (hdc, x + f.offset ().x, y + f.offset ().y, flags,
               &r, string, len, f.need_pad_p () ? padding : 0);
 }
@@ -396,7 +396,7 @@ static inline void
 paint_jp_chars (HDC hdc, int x, int y, int flags, const RECT &r,
                 const char *string, int len, const INT *padding)
 {
-  const FontObject &f = app.text_font.font (FONT_JP);
+  const FontObject &f = active_app_frame().text_font.font (FONT_JP);
   HGDIOBJ of = SelectObject (hdc, f);
   ExtTextOut (hdc, x + f.offset ().x, y + f.offset ().y, flags,
               &r, string, len, f.need_pad_p () ? padding : 0);
@@ -430,7 +430,7 @@ static inline void
 paint_jisx0212_half_width_chars (HDC hdc, int x, int y, int flags, const RECT &r,
                                  const char *string, int len, const INT *padding)
 {
-  const FontObject &f = app.text_font.font (FONT_JP);
+  const FontObject &f = active_app_frame().text_font.font (FONT_JP);
   HGDIOBJ of = SelectObject (hdc, f);
   paint_chars_ctx ctx (x + f.offset ().x, y + f.offset ().y, r, 1);
   for (const u_char *s = (const u_char *)string, *const se = s + len; s < se; s++)
@@ -443,7 +443,7 @@ paint_chars_lucida (HDC hdc, int x, int y, int flags, const RECT &r,
                     const char *string, int len, const INT *padding, int c)
 {
   static LOGFONT lf = {0,0,0,0,0,0,0,0,0,0,0,0,0,LUCIDA_FACE_NAME};
-  lf.lfHeight = app.text_font.font (FONT_ASCII).size ().cy;
+  lf.lfHeight = active_app_frame().text_font.font (FONT_ASCII).size ().cy;
   HGDIOBJ of = SelectObject (hdc, CreateFontIndirect (&lf));
   paint_chars_ctx ctx (x, y, r, 1);
   for (const u_char *s = (const u_char *)string, *const se = s + len; s < se; s++)
@@ -456,10 +456,10 @@ paint_chars (HDC hdc, int x, int y, int flags, const RECT &r,
              glyph_t charset, const char *string, int len, const INT *padding)
 {
 #define PAINT_FULL_WIDTH_CHARS(FONT) \
-  paint_full_width_chars (hdc, x, y, flags, r, string, len, app.text_font.font (FONT))
+  paint_full_width_chars (hdc, x, y, flags, r, string, len, active_app_frame().text_font.font (FONT))
 #define PAINT_HALF_WIDTH_CHARS(OFFSET, FONT) \
   paint_half_width_chars (hdc, x, y, flags, r, string, len, padding, \
-                          OFFSET, app.text_font.font (FONT))
+                          OFFSET, active_app_frame().text_font.font (FONT))
 #define PAINT_JISX0212_HALF_WIDTH_CHARS() \
   paint_jisx0212_half_width_chars (hdc, x, y, flags, r, string, len, padding)
 #define PAINT_CHARS_LUCIDA(OFFSET) \
@@ -569,7 +569,7 @@ Window::paint_glyphs (HDC hdc, HDC hdcmem, const glyph_t *gstart, const glyph_t 
 {
   RECT r;
   r.top = y + yoffset;
-  r.bottom = y + app.text_font.cell ().cy;
+  r.bottom = y + w_owner->text_font.cell ().cy;
   r.right = x;
   glyph_t gsum = 0;
   const glyph_t *gfrom = g;
@@ -589,7 +589,7 @@ Window::paint_glyphs (HDC hdc, HDC hdcmem, const glyph_t *gstart, const glyph_t 
         }
 
       r.left = r.right;
-      r.right += (be - buf) * app.text_font.cell ().cx;
+      r.right += (be - buf) * w_owner->text_font.cell ().cx;
       if (r.right > w_clsize.cx)
         {
           r.right = w_clsize.cx;
@@ -616,20 +616,20 @@ Window::paint_glyphs (HDC hdc, HDC hdcmem, const glyph_t *gstart, const glyph_t 
 
       if (c & GLYPH_BITMAP_BIT)
         {
-          int x = r.left + (b - buf) * app.text_font.cell ().cx;
-          for (; b < be; b++, x += app.text_font.cell ().cx)
+          int x = r.left + (b - buf) * w_owner->text_font.cell ().cx;
+          for (; b < be; b++, x += w_owner->text_font.cell ().cx)
             {
               int w = w_clsize.cx - x;
               if (w <= 0)
                 break;
-              if (w > app.text_font.cell ().cx)
-                w = app.text_font.cell ().cx;
-              BitBlt (hdc, x, r.top, w, app.text_font.cell ().cy,
-                      hdcmem, app.text_font.cell ().cx * (*b & 0xff), yoffset, SRCCOPY);
+              if (w > w_owner->text_font.cell ().cx)
+                w = w_owner->text_font.cell ().cx;
+              BitBlt (hdc, x, r.top, w, w_owner->text_font.cell ().cy,
+                      hdcmem, w_owner->text_font.cell ().cx * (*b & 0xff), yoffset, SRCCOPY);
             }
         }
       else
-        paint_chars (hdc, r.left + (b - buf) * app.text_font.cell ().cx, y,
+        paint_chars (hdc, r.left + (b - buf) * w_owner->text_font.cell ().cx, y,
                      ETO_OPAQUE | ETO_CLIPPED, r, GLYPH_CHARSET (c), b, be - b, padding);
 
       SetTextColor (hdc, ofg);
@@ -665,8 +665,8 @@ Window::paint_glyphs (HDC hdc, HDC hdcmem, const glyph_t *gstart, const glyph_t 
 
           COLORREF ofg = SetTextColor (hdc, glyph_forecolor (c0));
 
-          r.left = x + (g0 - gfrom) * app.text_font.cell ().cx + 1;
-          r.right = x + (g - gfrom) * app.text_font.cell ().cx + 1;
+          r.left = x + (g0 - gfrom) * w_owner->text_font.cell ().cx + 1;
+          r.right = x + (g - gfrom) * w_owner->text_font.cell ().cx + 1;
           if (r.right > w_clsize.cx)
             {
               r.right = w_clsize.cx;
@@ -678,16 +678,16 @@ Window::paint_glyphs (HDC hdc, HDC hdcmem, const glyph_t *gstart, const glyph_t 
             {
               COLORREF obg = SetBkColor (hdc, glyph_backcolor (c0));
               char *b = buf;
-              for (int x = r.left; b < be; b++, x += app.text_font.cell ().cx)
+              for (int x = r.left; b < be; b++, x += w_owner->text_font.cell ().cx)
                 if ((*b & 0xff) == FontSet::backsl)
                   {
                     int w = w_clsize.cx - x;
                     if (w <= 0)
                       break;
-                    if (w > app.text_font.cell ().cx)
-                      w = app.text_font.cell ().cx;
-                    BitBlt (hdc, x, r.top, w, app.text_font.cell ().cy,
-                            hdcmem, app.text_font.cell ().cx * FontSet::bold_backsl, yoffset, SRCCOPY);
+                    if (w > w_owner->text_font.cell ().cx)
+                      w = w_owner->text_font.cell ().cx;
+                    BitBlt (hdc, x, r.top, w, w_owner->text_font.cell ().cy,
+                            hdcmem, w_owner->text_font.cell ().cx * FontSet::bold_backsl, yoffset, SRCCOPY);
                   }
               SetBkColor (hdc, obg);
             }
@@ -715,8 +715,8 @@ Window::paint_glyphs (HDC hdc, HDC hdcmem, const glyph_t *gstart, const glyph_t 
             ;
 
           COLORREF obg = SetBkColor (hdc, glyph_forecolor (c));
-          r.left = x + (g0 - gfrom) * app.text_font.cell ().cx;
-          r.right = x + (g - gfrom) * app.text_font.cell ().cx;
+          r.left = x + (g0 - gfrom) * w_owner->text_font.cell ().cx;
+          r.right = x + (g - gfrom) * w_owner->text_font.cell ().cx;
           if (r.right > w_clsize.cx)
             {
               r.right = w_clsize.cx;
@@ -726,14 +726,14 @@ Window::paint_glyphs (HDC hdc, HDC hdcmem, const glyph_t *gstart, const glyph_t 
 
           if (c & GLYPH_UNDERLINE)
             {
-              r.bottom = y + app.text_font.size ().cy;
-              r.top = r.bottom - app.text_font.line_width ();
+              r.bottom = y + w_owner->text_font.size ().cy;
+              r.top = r.bottom - w_owner->text_font.line_width ();
               ExtTextOut (hdc, r.left, r.top, ETO_OPAQUE, &r, "", 0, 0);
             }
           if (!yoffset && c & GLYPH_STRIKEOUT)
             {
-              r.top = y + app.text_font.size ().cy / 2;
-              r.bottom = r.top + app.text_font.line_width ();
+              r.top = y + w_owner->text_font.size ().cy / 2;
+              r.bottom = r.top + w_owner->text_font.line_width ();
               ExtTextOut (hdc, r.left, r.top, ETO_OPAQUE, &r, "", 0, 0);
             }
 
@@ -778,8 +778,8 @@ Window::paint_line (HDC hdc, HDC hdcmem, glyph_data *ogd, const glyph_data *ngd,
             n++, o++;
         }
       else
-        PatBlt (hdc, ((ogd->gd_len - 1) * app.text_font.cell ().cx + app.text_font.cell ().cx / 2), y,
-                app.text_font.cell ().cx, app.text_font.cell ().cy, PATCOPY);
+        PatBlt (hdc, ((ogd->gd_len - 1) * w_owner->text_font.cell ().cx + w_owner->text_font.cell ().cx / 2), y,
+                w_owner->text_font.cell ().cx, w_owner->text_font.cell ().cy, PATCOPY);
     }
 
   const glyph_t *nls = n;
@@ -790,8 +790,8 @@ Window::paint_line (HDC hdc, HDC hdcmem, glyph_data *ogd, const glyph_data *ngd,
   if (!dl)
     {
       paint_glyphs (hdc, hdcmem, ngd->gd_cc, nfd, nls, buf, padding,
-                    ((nfd - ngd->gd_cc - 1) * app.text_font.cell ().cx
-                     + app.text_font.cell ().cx / 2),
+                    ((nfd - ngd->gd_cc - 1) * w_owner->text_font.cell ().cx
+                     + w_owner->text_font.cell ().cx / 2),
                     y, 0);
       for (o = ofd, n = nfd; n < nls;)
         *o++ = *n++;
@@ -801,28 +801,28 @@ Window::paint_line (HDC hdc, HDC hdcmem, glyph_data *ogd, const glyph_data *ngd,
       if (ogd->gd_len - (ols - ogd->gd_cc) <= 3)
         {
           paint_glyphs (hdc, hdcmem, ngd->gd_cc, nfd, ne, buf, padding,
-                        ((nfd - ngd->gd_cc - 1) * app.text_font.cell ().cx
-                         + app.text_font.cell ().cx / 2),
+                        ((nfd - ngd->gd_cc - 1) * w_owner->text_font.cell ().cx
+                         + w_owner->text_font.cell ().cx / 2),
                         y, 0);
           if (dl < 0 && ogd->gd_len > ngd->gd_len)
             PatBlt (hdc,
-                    ((ngd->gd_len - 1) * app.text_font.cell ().cx
-                     + app.text_font.cell ().cx / 2),
+                    ((ngd->gd_len - 1) * w_owner->text_font.cell ().cx
+                     + w_owner->text_font.cell ().cx / 2),
                     y,
-                    (ogd->gd_len - ngd->gd_len) * app.text_font.cell ().cx,
-                    app.text_font.cell ().cy,
+                    (ogd->gd_len - ngd->gd_len) * w_owner->text_font.cell ().cx,
+                    w_owner->text_font.cell ().cy,
                     PATCOPY);
         }
       else
         {
           RECT r;
           r.top = y;
-          r.bottom = y + app.text_font.cell ().cy;
-          r.left = ((ols - ogd->gd_cc - 1) * app.text_font.cell ().cx
-                    + app.text_font.cell ().cx / 2);
-          r.right = ((ogd->gd_len - 1) * app.text_font.cell ().cx
-                     + app.text_font.cell ().cx / 2);
-          int dx = dl * app.text_font.cell ().cx;
+          r.bottom = y + w_owner->text_font.cell ().cy;
+          r.left = ((ols - ogd->gd_cc - 1) * w_owner->text_font.cell ().cx
+                    + w_owner->text_font.cell ().cx / 2);
+          r.right = ((ogd->gd_len - 1) * w_owner->text_font.cell ().cx
+                     + w_owner->text_font.cell ().cx / 2);
+          int dx = dl * w_owner->text_font.cell ().cx;
           if (r.right + dx > w_clsize.cx)
             {
               r.right = w_clsize.cx - dx;
@@ -833,8 +833,8 @@ Window::paint_line (HDC hdc, HDC hdcmem, glyph_data *ogd, const glyph_data *ngd,
             {
               if (r.right > w_clsize.cx)
                 {
-                  int x = ((w_clsize.cx + app.text_font.cell ().cx / 2)
-                           / app.text_font.cell ().cx + dl);
+                  int x = ((w_clsize.cx + w_owner->text_font.cell ().cx / 2)
+                           / w_owner->text_font.cell ().cx + dl);
                   if (x >= 0 && x < ngd->gd_len)
                     {
                       const glyph_t *g = ngd->gd_cc + x;
@@ -848,26 +848,26 @@ Window::paint_line (HDC hdc, HDC hdcmem, glyph_data *ogd, const glyph_data *ngd,
                       else if (glyph_lead_p (*g))
                         l = 2;
                       paint_glyphs (hdc, hdcmem, ngd->gd_cc, g, g + l, buf, padding,
-                                    (x - 1) * app.text_font.cell ().cx + app.text_font.cell ().cx / 2,
+                                    (x - 1) * w_owner->text_font.cell ().cx + w_owner->text_font.cell ().cx / 2,
                                     y, 0);
                     }
                 }
-              r.left = ((ngd->gd_len - 1) * app.text_font.cell ().cx
-                        + app.text_font.cell ().cx / 2);
+              r.left = ((ngd->gd_len - 1) * w_owner->text_font.cell ().cx
+                        + w_owner->text_font.cell ().cx / 2);
               ValidateRect (w_hwnd, &r);
               PatBlt (hdc, r.left, r.top,
-                      r.right - r.left, app.text_font.cell ().cy,
+                      r.right - r.left, w_owner->text_font.cell ().cy,
                       PATCOPY);
             }
           else
             {
-              r.right = ((nls - ngd->gd_cc - 1) * app.text_font.cell ().cx
-                         + app.text_font.cell ().cx / 2);
+              r.right = ((nls - ngd->gd_cc - 1) * w_owner->text_font.cell ().cx
+                         + w_owner->text_font.cell ().cx / 2);
               ValidateRect (w_hwnd, &r);
             }
           paint_glyphs (hdc, hdcmem, ngd->gd_cc, nfd, nls, buf, padding,
-                        ((nfd - ngd->gd_cc - 1) * app.text_font.cell ().cx
-                         + app.text_font.cell ().cx / 2),
+                        ((nfd - ngd->gd_cc - 1) * w_owner->text_font.cell ().cx
+                         + w_owner->text_font.cell ().cx / 2),
                         y, 0);
         }
       for (o = ofd, n = nfd; n < ne;)
@@ -877,13 +877,20 @@ Window::paint_line (HDC hdc, HDC hdcmem, glyph_data *ogd, const glyph_data *ngd,
     }
 }
 
+int
+Window::get_fold_columns () const
+{
+	return w_bufp->get_fold_columns(this);
+}
+
+
 void
 Window::erase_cursor_line (HDC hdc) const
 {
   if (w_cursor_line.ypixel < 0 || !w_glyphs.g_rep)
     return;
 
-  int y = w_cursor_line.ypixel / app.text_font.cell ().cy;
+  int y = w_cursor_line.ypixel / w_owner->text_font.cell ().cy;
   if (y >= 0 && y < w_ch_max.cy)
     {
       HDC xhdc = hdc;
@@ -893,45 +900,45 @@ Window::erase_cursor_line (HDC hdc) const
           hdc = GetDC (w_hwnd);
         }
 
-      int x1 = (w_cursor_line.x1 - app.text_font.cell ().cx / 2) / app.text_font.cell ().cx + 1;
+      int x1 = (w_cursor_line.x1 - w_owner->text_font.cell ().cx / 2) / w_owner->text_font.cell ().cx + 1;
       int x2pixel = w_cursor_line.x2;
-      if (w_bufp->b_fold_columns != Buffer::FOLD_NONE)
+      if (get_fold_columns() != Buffer::FOLD_NONE)
         {
-          int w = w_cursor_line.x1 + ((w_bufp->b_fold_columns - w_last_top_column)
-                                      * app.text_font.cell ().cx);
+          int w = w_cursor_line.x1 + ((get_fold_columns() - w_last_top_column)
+                                      * w_owner->text_font.cell ().cx);
           if (x2pixel < w)
             x2pixel = w;
         }
-      int x2 = (x2pixel - app.text_font.cell ().cx / 2
-                + app.text_font.cell ().cx - 1) / app.text_font.cell ().cx + 1;
+      int x2 = (x2pixel - w_owner->text_font.cell ().cx / 2
+                + w_owner->text_font.cell ().cx - 1) / w_owner->text_font.cell ().cx + 1;
 
       const glyph_data *gd = w_glyphs.g_rep->gr_oglyph[y];
       const glyph_t *g = gd->gd_cc + x1, *ge = gd->gd_cc + min (int (gd->gd_len), x2);
       int x = w_cursor_line.x1;
-      HGDIOBJ of = SelectObject (hdc, app.text_font.font (FONT_ASCII));
+      HGDIOBJ of = SelectObject (hdc, w_owner->text_font.font (FONT_ASCII));
       HDC hdcmem = CreateCompatibleDC (hdc);
-      HGDIOBJ obm = SelectObject (hdcmem, app.text_font.hbm ());
+      HGDIOBJ obm = SelectObject (hdcmem, w_owner->text_font.hbm ());
       HGDIOBJ obr = SelectObject (hdc, CreateSolidBrush (w_colors[WCOLOR_BACK]));
 
       INT *padding;
-      if (!app.text_font.need_pad_p ())
+      if (!w_owner->text_font.need_pad_p ())
         padding = 0;
       else
         {
           padding = (INT *)alloca (sizeof *padding * w_ch_max.cx);
           for (int i = 0; i < w_ch_max.cx; i++)
-            padding[i] = app.text_font.cell ().cx;
+            padding[i] = w_owner->text_font.cell ().cx;
         }
       char *buf = (char *)alloca (w_ch_max.cx + 3);
       paint_glyphs (hdc, hdcmem, gd->gd_cc, g, ge, buf, padding, x,
-                    (w_cursor_line.ypixel - app.text_font.cell ().cy + 1),
-                    app.text_font.cell ().cy - 1);
+                    (w_cursor_line.ypixel - w_owner->text_font.cell ().cy + 1),
+                    w_owner->text_font.cell ().cy - 1);
       SelectObject (hdcmem, obm);
       DeleteDC (hdcmem);
       SelectObject (hdc, of);
       DeleteObject (SelectObject (hdc, obr));
 
-      x += (ge - g) * app.text_font.cell ().cx;
+      x += (ge - g) * w_owner->text_font.cell ().cx;
       if (x < w_cursor_line.x2)
         draw_hline (hdc, x, w_cursor_line.x2,
                     w_cursor_line.ypixel, w_colors[WCOLOR_BACK]);
@@ -954,19 +961,19 @@ Window::paint_cursor_line (HDC hdc, int f) const
   if (paint)
     {
       x1 = ((w_last_flags & WF_LINE_NUMBER ? LINENUM_COLUMNS + 1 : 0)
-            * app.text_font.cell ().cx + app.text_font.cell ().cx / 2);
-      x2 = w_ch_max.cx * app.text_font.cell ().cx;
-      if (w_bufp->b_fold_columns != Buffer::FOLD_NONE)
+            * w_owner->text_font.cell ().cx + w_owner->text_font.cell ().cx / 2);
+      x2 = w_ch_max.cx * w_owner->text_font.cell ().cx;
+      if (get_fold_columns() != Buffer::FOLD_NONE)
         {
-          int w = x1 + ((w_bufp->b_fold_columns - w_last_top_column)
-                        * app.text_font.cell ().cx);
+          int w = x1 + ((get_fold_columns() - w_last_top_column)
+                        * w_owner->text_font.cell ().cx);
           if (w < x2)
             x2 = w;
         }
       if (x2 > w_clsize.cx)
         x2 = w_clsize.cx;
 
-      y = (w_linenum - w_last_top_linenum + 1) * app.text_font.cell ().cy - 1;
+      y = (w_linenum - w_last_top_linenum + 1) * w_owner->text_font.cell ().cy - 1;
 
       if (y != w_cursor_line.ypixel
           || x1 != w_cursor_line.x1
@@ -1372,7 +1379,7 @@ glyph_dbchar (glyph_t *g, Char cc, int f, int flags)
 }
 
 static inline glyph_t *
-glyph_sbchar (glyph_t *g, Char cc, int f, int flags)
+glyph_sbchar (ApplicationFrame *app1, glyph_t *g, Char cc, int f, int flags)
 {
   int ccs = code_charset (cc);
   switch (ccs)
@@ -1448,7 +1455,7 @@ glyph_sbchar (glyph_t *g, Char cc, int f, int flags)
       break;
 
     case ccs_usascii:
-      if (app.text_font.use_backsl_p () && cc == '\\')
+      if (app1->text_font.use_backsl_p () && cc == '\\')
         *g++ = f | GLYPH_BM_BACKSL;
       else if (flags & Window::WF_HALFSPC && cc == ' ')
         *g++ = (f & ~GLYPH_TEXT_MASK) | GLYPH_CTRL | GLYPH_BM_HALFSPC;
@@ -1482,7 +1489,7 @@ glyph_sbchar (glyph_t *g, Char cc, int f, int flags)
 }
 
 static inline glyph_t *
-glyph_bmchar (glyph_t *g, Char bm, lisp ch, int f, int n)
+glyph_bmchar (ApplicationFrame *app1, glyph_t *g, Char bm, lisp ch, int f, int n)
 {
   ch = xsymbol_value (ch);
   if (ch == Qnil)
@@ -1490,7 +1497,7 @@ glyph_bmchar (glyph_t *g, Char bm, lisp ch, int f, int n)
       *g++ = f | ' ';
   else if (charp (ch) && char_width (xchar_code (ch)) == 1)
     for (int i = 0; i < n; i++)
-      g = glyph_sbchar (g, xchar_code (ch), f, 0);
+      g = glyph_sbchar (app1, g, xchar_code (ch), f, 0);
   else
     for (int i = 0; i < n; i++)
       *g++ = f | bm;
@@ -1713,7 +1720,8 @@ regexp_kwd::kwdmatch (const Point &point, int scolor, int &revkwd)
                                   rk_use_vals = 1;
                                   int vals[MAX_REGS];
                                   vals[0] = 0;
-                                  for (int i = 1; i <= re.re_regs.nregs; i++)
+								  int i;
+                                  for (i = 1; i <= re.re_regs.nregs; i++)
                                     vals[i] = -1;
                                   do
                                     {
@@ -1931,7 +1939,7 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
                   g = glyph_dbchar (g, cc, 0, 0);
                 }
               else
-                g = glyph_sbchar (g, cc, 0, 0);
+                g = glyph_sbchar (w_owner, g, cc, 0, 0);
             }
         }
       while (g < ge2)
@@ -1954,22 +1962,22 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
 
   point_t limit;
   Point fold_eol;
-  if (w_bufp->b_fold_columns != Buffer::FOLD_NONE)
+  if (get_fold_columns() != Buffer::FOLD_NONE)
     {
       fold_eol = point;
-      w_bufp->folded_go_eol (fold_eol);
+      folded_go_eol (fold_eol);
       limit = min (w_bufp->b_nchars, point_t (fold_eol.p_point + 1));
     }
   else
     limit = w_bufp->b_nchars;
 
-  const int fold_column = w_bufp->b_fold_columns - w_top_column;
+  const int fold_column = get_fold_columns() - w_top_column;
   if (w_top_column)
     {
       long col = w_bufp->forward_column (point, w_top_column, 0, 1, 0);
       if (col < w_top_column || point.p_point >= limit)
         {
-          if (w_bufp->b_fold_columns != Buffer::FOLD_NONE)
+          if (get_fold_columns() != Buffer::FOLD_NONE)
             {
               point = fold_eol;
               if (wflags & WF_FOLD_LINE && fold_column >= 0)
@@ -2037,7 +2045,7 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
           scolor = syntax_state::ss_colors[syntax_state::SS_NORMAL][psi->si.ss_state];
           if (scolor & (syntax_state::KWD_OK | syntax_state::KWD2_OK)
               && !re_kwd.match_p ()
-              && w_bufp->b_fold_columns != Buffer::FOLD_NONE
+              && get_fold_columns() != Buffer::FOLD_NONE
               && kwdhash && point.p_point && point.prevch () != '\n'
               && point.p_offset < point.p_chunk->c_used)
             kwdflag = kwdmatch (kwdhash, point, symlen, revkwd, long_kwd, scolor);
@@ -2085,7 +2093,7 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
               if (wflags & WF_EOF
                   && (!hide || w_bufp->b_contents.p2 == w_bufp->b_nchars))
                 {
-                  if (w_bufp->b_fold_columns != Buffer::FOLD_NONE)
+                  if (get_fold_columns() != Buffer::FOLD_NONE)
                     {
                       Point tem (fold_eol);
                       if (w_bufp->next_char (tem))
@@ -2261,7 +2269,7 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
                   if (seltype == Buffer::SELECTION_RECTANGLE)
                     f &= ~GLYPH_SELECTED;
                   if (wflags & WF_NEWLINE)
-                    g = glyph_bmchar (g, GLYPH_BM_NEWLINE, Vdisplay_newline_char,
+                    g = glyph_bmchar (w_owner, g, GLYPH_BM_NEWLINE, Vdisplay_newline_char,
                                       (f & ~GLYPH_TEXT_MASK) | GLYPH_CTRL, 1);
                   else
                     *g++ = (f & ~GLYPH_TEXT_MASK) | ' ';
@@ -2276,10 +2284,10 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
                   int n = min (goal - col, ge - g);
                   if (wflags & WF_HTAB)
                     {
-                      g = glyph_bmchar (g, GLYPH_BM_HTAB, Vdisplay_first_tab_char,
+                      g = glyph_bmchar (w_owner, g, GLYPH_BM_HTAB, Vdisplay_first_tab_char,
                                         (f & ~GLYPH_TEXT_MASK) | GLYPH_CTRL, 1);
                       if (--n > 0)
-                        g = glyph_bmchar (g, '.', Vdisplay_rest_tab_char,
+                        g = glyph_bmchar (w_owner, g, '.', Vdisplay_rest_tab_char,
                                           (f & ~GLYPH_TEXT_MASK) | GLYPH_CTRL, n);
                     }
                   else
@@ -2317,7 +2325,7 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
               g = glyph_dbchar (g, cc, f, wflags);
             }
           else
-            g = glyph_sbchar (g, cc, f, wflags);
+            g = glyph_sbchar (w_owner, g, cc, f, wflags);
 
           if (f & GLYPH_SELECTED
               && seltype == Buffer::SELECTION_RECTANGLE
@@ -2336,13 +2344,13 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
            ? last_attrib & ((GLYPH_TEXTPROP_NCOLORS - 1)
                             << GLYPH_TEXTPROP_BG_SHIFT_BITS)
            : 0);
-  glyph_t *const grev = (w_bufp->b_fold_columns == Buffer::FOLD_NONE
+  glyph_t *const grev = (get_fold_columns() == Buffer::FOLD_NONE
                          ? ge : min (ge, max (g0 + max (fold_column, 0), g)));
   glyph_t *const gfold = g0 + fold_column;
 
   if (end_in_range)
     {
-      if (w_bufp->b_fold_columns != Buffer::FOLD_NONE
+      if (get_fold_columns() != Buffer::FOLD_NONE
           && wflags & WF_FOLD_MARK
           && !eof && !eol && g < ge
           && !exceed && point.p_point == limit)
@@ -2388,7 +2396,7 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
         }
     }
 
-  if (w_bufp->b_fold_columns != Buffer::FOLD_NONE
+  if (get_fold_columns() != Buffer::FOLD_NONE
       && wflags & WF_FOLD_LINE && g <= gfold && gfold < ge)
     {
       for (; g < gfold; g++)
@@ -2416,7 +2424,7 @@ Window::redraw_line (glyph_data *gd, Point &point, long vlinenum, long plinenum,
       point.p_offset = p - cp->c_text;
     }
 
-  if (w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+  if (get_fold_columns() == Buffer::FOLD_NONE)
     return eol;
 
   if (psi && point.p_offset < point.p_chunk->c_used && tailg > g0
@@ -2460,13 +2468,13 @@ Window::scroll_down_region (int y1, int y2, int dy, int offset) const
       }
 
   RECT r;
-  r.left = (offset - 1) * app.text_font.cell ().cx + app.text_font.cell ().cx / 2;
-  r.right = min (w_client.cx, LONG ((maxl - 1) * app.text_font.cell ().cx
-                                    + app.text_font.cell ().cx / 2));
-  r.top = y1 * app.text_font.cell ().cy;
-  r.bottom = (y2 + 1) * app.text_font.cell ().cy;
-  ScrollWindow (w_hwnd, 0, dy * app.text_font.cell ().cy, 0, &r);
-  r.bottom = r.top + dy * app.text_font.cell ().cy;
+  r.left = (offset - 1) * w_owner->text_font.cell ().cx + w_owner->text_font.cell ().cx / 2;
+  r.right = min (w_client.cx, LONG ((maxl - 1) * w_owner->text_font.cell ().cx
+                                    + w_owner->text_font.cell ().cx / 2));
+  r.top = y1 * w_owner->text_font.cell ().cy;
+  r.bottom = (y2 + 1) * w_owner->text_font.cell ().cy;
+  ScrollWindow (w_hwnd, 0, dy * w_owner->text_font.cell ().cy, 0, &r);
+  r.bottom = r.top + dy * w_owner->text_font.cell ().cy;
   ValidateRect (w_hwnd, &r);
 }
 
@@ -2496,13 +2504,13 @@ Window::scroll_up_region (int y1, int y2, int dy, int offset) const
       }
 
   RECT r;
-  r.left = (offset - 1) * app.text_font.cell ().cx + app.text_font.cell ().cx / 2;
-  r.right = min (w_client.cx, LONG ((maxl - 1) * app.text_font.cell ().cx
-                                    + app.text_font.cell ().cx / 2));
-  r.top = y1 * app.text_font.cell ().cy;
-  r.bottom = (y2 + 1) * app.text_font.cell ().cy;
-  ScrollWindow (w_hwnd, 0, -dy * app.text_font.cell ().cy, 0, &r);
-  r.top = r.bottom - dy * app.text_font.cell ().cy;
+  r.left = (offset - 1) * w_owner->text_font.cell ().cx + w_owner->text_font.cell ().cx / 2;
+  r.right = min (w_client.cx, LONG ((maxl - 1) * w_owner->text_font.cell ().cx
+                                    + w_owner->text_font.cell ().cx / 2));
+  r.top = y1 * w_owner->text_font.cell ().cy;
+  r.bottom = (y2 + 1) * w_owner->text_font.cell ().cy;
+  ScrollWindow (w_hwnd, 0, -dy * w_owner->text_font.cell ().cy, 0, &r);
+  r.top = r.bottom - dy * w_owner->text_font.cell ().cy;
   ValidateRect (w_hwnd, &r);
 }
 
@@ -2557,7 +2565,8 @@ Window::find_motion () const
   down.n = 0;
   up.n = 0;
 
-  for (int y = y2 - 1; y > y1; y--)
+  int y;
+  for (y = y2 - 1; y > y1; y--)
     {
       int f = compare_glyph (og[y], ng[y2], offset);
       if (!f)
@@ -2580,7 +2589,7 @@ Window::find_motion () const
 
   for (int i = 0; i < 3; i++, y2--)
     {
-      for (int y = y2 - 1; y >= y1; y--)
+      for (y = y2 - 1; y >= y1; y--)
         {
           int f = compare_glyph (og[y2], ng[y], offset);
           if (!f)
@@ -2625,25 +2634,25 @@ Window::find_motion () const
 void
 Window::paint_region (HDC hdc, int from, int to) const
 {
-  HGDIOBJ of = SelectObject (hdc, app.text_font.font (FONT_ASCII));
+  HGDIOBJ of = SelectObject (hdc, w_owner->text_font.font (FONT_ASCII));
   HDC hdcmem = CreateCompatibleDC (hdc);
-  HGDIOBJ obm = SelectObject (hdcmem, app.text_font.hbm ());
+  HGDIOBJ obm = SelectObject (hdcmem, w_owner->text_font.hbm ());
   HGDIOBJ obr = SelectObject (hdc, CreateSolidBrush (w_colors[WCOLOR_BACK]));
 
   INT *padding;
-  if (!app.text_font.need_pad_p ())
+  if (!w_owner->text_font.need_pad_p ())
     padding = 0;
   else
     {
       padding = (INT *)alloca (sizeof *padding * w_ch_max.cx);
       for (int i = 0; i < w_ch_max.cx; i++)
-        padding[i] = app.text_font.cell ().cx;
+        padding[i] = w_owner->text_font.cell ().cx;
     }
   char *buf = (char *)alloca (w_ch_max.cx + 3);
   glyph_data **g = w_glyphs.g_rep->gr_nglyph + from;
   glyph_data **og = w_glyphs.g_rep->gr_oglyph + from;
-  for (int y = from * app.text_font.cell ().cy, ye = to * app.text_font.cell ().cy;
-       y < ye; y += app.text_font.cell ().cy, g++, og++)
+  for (int y = from * w_owner->text_font.cell ().cy, ye = to * w_owner->text_font.cell ().cy;
+       y < ye; y += w_owner->text_font.cell ().cy, g++, og++)
     if ((*g)->gd_mod)
       {
         paint_line (hdc, hdcmem, *og, *g, buf, y, padding);
@@ -2682,7 +2691,7 @@ Window::redraw_window (Point &p, long vlinenum, int all, int hide) const
                      p.p_point, w_bufp);
 
   int plf = (flags () & WF_LINE_NUMBER
-             && w_bufp->b_fold_columns != Buffer::FOLD_NONE
+             && get_fold_columns() != Buffer::FOLD_NONE
              && w_bufp->linenum_mode () == Buffer::LNMODE_LF);
   long plinenum = plf ? w_bufp->point_linenum (p) : -1;
   textprop *tprop = w_bufp->textprop_head (p.p_point);
@@ -2693,13 +2702,13 @@ Window::redraw_window (Point &p, long vlinenum, int all, int hide) const
           || !redraw_line (*g, p, vlinenum, plinenum, hide,
                            kwdhash, ppsi, tprop, re_kwd))
         {
-          if (w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+          if (get_fold_columns() == Buffer::FOLD_NONE)
             w_bufp->go_eol (p);
           else
 #if 0
-            w_bufp->folded_forward_column (p, w_bufp->b_fold_columns, 0, 0, 0);
+            folded_forward_column (p, get_fold_columns(), 0, 0, 0);
 #else
-            w_bufp->folded_go_eol (p);
+            folded_go_eol (p);
 #endif
           if (!w_bufp->next_char (p))
             {
@@ -2724,29 +2733,30 @@ Window::scroll_lines (int dy)
 
   glyph_data **og = w_glyphs.g_rep->gr_oglyph;
   int maxl = 0;
-  for (int i = 0; i < w_ch_max.cy; i++, og++)
+  int i;
+  for (i = 0; i < w_ch_max.cy; i++, og++)
     maxl = max (maxl, int ((*og)->gd_len));
 
   RECT r;
   r.left = 0;
-  r.right = min (w_client.cx, LONG ((maxl - 1) * app.text_font.cell ().cx
-                                    + app.text_font.cell ().cx / 2));
+  r.right = min (w_client.cx, LONG ((maxl - 1) * w_owner->text_font.cell ().cx
+                                    + w_owner->text_font.cell ().cx / 2));
   r.top = 0;
   if (dy < 0)
-    r.bottom = w_ech.cy * app.text_font.cell ().cy;
+    r.bottom = w_ech.cy * w_owner->text_font.cell ().cy;
   else
     r.bottom = w_client.cy;
-  ScrollWindow (w_hwnd, 0, dy * app.text_font.cell ().cy, 0, &r);
+  ScrollWindow (w_hwnd, 0, dy * w_owner->text_font.cell ().cy, 0, &r);
   if (dy < 0)
     {
       r.bottom = w_client.cy;
-      r.top = ((r.bottom + dy * app.text_font.cell ().cy)
-               / app.text_font.cell ().cy * app.text_font.cell ().cy);
+      r.top = ((r.bottom + dy * w_owner->text_font.cell ().cy)
+               / w_owner->text_font.cell ().cy * w_owner->text_font.cell ().cy);
     }
   else
     {
       r.top = 0;
-      r.bottom = dy * app.text_font.cell ().cy;
+      r.bottom = dy * w_owner->text_font.cell ().cy;
     }
   ValidateRect (w_hwnd, &r);
 
@@ -2848,17 +2858,30 @@ Window::folded_bol_point (point_t goal) const
 {
   Point p (w_point);
   w_bufp->goto_char (p, goal);
-  w_bufp->folded_goto_bol (p);
+  folded_goto_bol (p);
   return p.p_point;
 }
+
+long
+Window::folded_point_linenum (point_t point) const
+{
+	return w_bufp->folded_point_linenum(point, get_fold_columns());
+}
+
+long
+Window::folded_point_column (const Point &point) const
+{
+	return w_bufp->folded_point_column(point, get_fold_columns());
+}
+
 
 void
 Window::reframe ()
 {
   assert (w_bufp);
 
-  if (w_bufp->b_fold_columns != Buffer::FOLD_NONE)
-    w_bufp->folded_count_lines ();
+  if (get_fold_columns() != Buffer::FOLD_NONE)
+    w_bufp->folded_count_lines (get_fold_columns());
 
   Region modr = w_bufp->b_modified_region;
   if ((w_selection_type & (Buffer::CONTINUE_PRE_SELECTION
@@ -2908,7 +2931,7 @@ Window::reframe ()
           break;
 
         case Buffer::SELECTION_LINEAR:
-          if (w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+          if (get_fold_columns() == Buffer::FOLD_NONE)
             {
               p1 = bol_point (p1);
               p2 = bol_point (p2);
@@ -2935,9 +2958,9 @@ Window::reframe ()
 
   long mark_linenum = ((symbol_value (Vinverse_mark_line, w_bufp) != Qnil
                         && w_mark != NO_MARK_SET)
-                       ? (w_bufp->b_fold_columns == Buffer::FOLD_NONE
+                       ? (get_fold_columns() == Buffer::FOLD_NONE
                           ? w_bufp->point_linenum (w_mark)
-                          : w_bufp->folded_point_linenum (w_mark))
+                          : folded_point_linenum (w_mark))
                        : -1);
   if (mark_linenum != w_last_mark_linenum)
     {
@@ -2948,15 +2971,15 @@ Window::reframe ()
   if (!need_repaint && w_point.p_point == w_last_point)
     {
 #ifdef DEBUG
-      if (w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+      if (get_fold_columns() == Buffer::FOLD_NONE)
         {
           assert (w_linenum == w_bufp->point_linenum (w_point));
           assert (w_column == w_bufp->point_column (w_point));
         }
       else
         {
-          assert (w_linenum == w_bufp->folded_point_linenum (w_point));
-          assert (w_column == w_bufp->folded_point_column (w_point));
+          assert (w_linenum == folded_point_linenum (w_point));
+          assert (w_column == folded_point_column (w_point));
         }
 #endif
       if (w_disp_flags & WDF_GOAL_COLUMN)
@@ -2968,7 +2991,7 @@ Window::reframe ()
   w_last_point = w_point.p_point;
 
   long linenum, column;
-  if (w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+  if (get_fold_columns() == Buffer::FOLD_NONE)
     {
       linenum = w_bufp->point_linenum (w_point);
       column = w_bufp->point_column (w_point);
@@ -2976,7 +2999,7 @@ Window::reframe ()
     }
   else
     {
-      linenum = w_bufp->folded_point_linenum_column (w_point, &column);
+      linenum = w_bufp->folded_point_linenum_column (w_point, get_fold_columns(), &column);
       w_plinenum = (w_bufp->linenum_mode () == Buffer::LNMODE_LF
                     ? w_bufp->point_linenum (w_point)
                     : linenum);
@@ -3021,7 +3044,7 @@ Window::reframe ()
     w_disp = w_bufp->b_contents.p1;
 
   long last_linenum, disp_linenum;
-  if (w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+  if (get_fold_columns() == Buffer::FOLD_NONE)
     {
       last_linenum = w_bufp->point_linenum (w_last_disp);
       disp_linenum = (w_disp == w_last_disp
@@ -3030,10 +3053,10 @@ Window::reframe ()
     }
   else
     {
-      last_linenum = w_bufp->folded_point_linenum (w_last_disp);
+      last_linenum = folded_point_linenum (w_last_disp);
       disp_linenum = (w_disp == w_last_disp
                       ? last_linenum
-                      : w_bufp->folded_point_linenum (w_disp));
+                      : folded_point_linenum (w_disp));
     }
 
   if (flags () & WF_SCROLLING)
@@ -3084,9 +3107,9 @@ Window::reframe ()
   disp_linenum = max (1L, disp_linenum);
 
   Point df;
-  disp_linenum = (w_bufp->b_fold_columns == Buffer::FOLD_NONE
+  disp_linenum = (get_fold_columns() == Buffer::FOLD_NONE
                   ? w_bufp->linenum_point (df, disp_linenum)
-                  : w_bufp->folded_linenum_point (df, disp_linenum));
+                  : folded_linenum_point (df, disp_linenum));
 
   if (!need_repaint && df.p_point == w_last_disp)
     {
@@ -3125,7 +3148,7 @@ Window::reframe ()
 paint:
   HDC hdc = GetDC (w_hwnd);
   if (w_cursor_line.ypixel >= 0
-      && w_cursor_line.x1 == app.text_font.cell ().cx / 2
+      && w_cursor_line.x1 == w_owner->text_font.cell ().cx / 2
       && flags () & WF_LINE_NUMBER)
     erase_cursor_line (hdc);
   paint_window (hdc);
@@ -3176,10 +3199,10 @@ Window::paint_minibuffer_message (lisp string)
           g = glyph_dbchar (g, cc, 0, 0);
         }
       else
-        g = glyph_sbchar (g, cc, 0, 0);
+        g = glyph_sbchar (w_owner, g, cc, 0, 0);
     }
 
-  app.minibuffer_prompt_column = g - (*gr)->gd_cc;
+  w_owner->minibuffer_prompt_column = g - (*gr)->gd_cc;
 
   for (; g > (*gr)->gd_cc && g[-1] == ' '; g--)
     ;
@@ -3273,7 +3296,7 @@ mode_line_percent_painter::need_repaint_all ()
 }
 
 int
-mode_line_percent_painter::calc_percent (Buffer* bufp, point_t point)
+mode_line_percent_painter::calc_percent (const Buffer* bufp, point_t point)
 {
   if(bufp->b_nchars > 0)
     return (100*point) / bufp->b_nchars;
@@ -3311,6 +3334,7 @@ mode_line_percent_painter::paint_percent (HDC hdc)
 
   return (int)right;
 }
+
 
 
 bool
@@ -3393,7 +3417,7 @@ Window::paint_mode_line (HDC hdc)
       b = b0;
       *b++ = ' ';
 
-      buffer_info binfo (this, w_bufp, &posp, &w_ime_mode_line, &percentp);
+      buffer_info binfo (w_owner, this, w_bufp, &posp, &w_ime_mode_line, &percentp);
       b = binfo.format (fmt, b, b0 + l);
     }
   else
@@ -3417,7 +3441,7 @@ Window::paint_mode_line (HDC hdc)
       ofg = SetTextColor (hdc, w_colors[WCOLOR_MODELINE_FG]);
       obg = SetBkColor (hdc, w_colors[WCOLOR_MODELINE_BG]);
     }
-  HGDIOBJ of = SelectObject (hdc, app.modeline_param.m_hfont);
+  HGDIOBJ of = SelectObject (hdc, w_owner->modeline_param.m_hfont);
 
   RECT r;
   r.left = 1;
@@ -3429,7 +3453,7 @@ Window::paint_mode_line (HDC hdc)
   w_point_painter.set_posp(posp);
   w_percent_painter.set_posp(percentp);
   if(posp) {
-	  w_point_painter.setup_paint(&app.modeline_param, w_column, w_plinenum, w_ml_size);
+	  w_point_painter.setup_paint(&w_owner->modeline_param, w_column, w_plinenum, w_ml_size);
 	  painters.push_back(&w_point_painter);
   }
   else
@@ -3439,7 +3463,7 @@ Window::paint_mode_line (HDC hdc)
 
 
   if(percentp) {
-	  w_percent_painter.setup_paint(&app.modeline_param, mode_line_percent_painter::calc_percent(w_bufp, w_point.p_point), w_ml_size);
+	  w_percent_painter.setup_paint(&w_owner->modeline_param, mode_line_percent_painter::calc_percent(w_bufp, w_point.p_point), w_ml_size);
 
 	  if(posp && posp > percentp) // tenuki sort.
 		  painters.push_front(&w_percent_painter);
@@ -3454,7 +3478,7 @@ Window::paint_mode_line (HDC hdc)
 
   if (painters.size() == 0)
     {
-      ExtTextOut (hdc, 1, 1 + app.modeline_param.m_exlead,
+      ExtTextOut (hdc, 1, 1 + w_owner->modeline_param.m_exlead,
                   ETO_OPAQUE | ETO_CLIPPED, &r, b0, b - b0, 0);
     }
   else
@@ -3478,7 +3502,7 @@ Window::paint_mode_line (HDC hdc)
 			  point_start_px = r.left + size.cx;
 
 			  r.right = min (point_start_px, int (w_ml_size.cx - 1));
-			  ExtTextOut (hdc, r.left, 1 + app.modeline_param.m_exlead,
+			  ExtTextOut (hdc, r.left, 1 + w_owner->modeline_param.m_exlead,
 						  ETO_OPAQUE | ETO_CLIPPED, &r, b1, painter->get_posp() - b1, 0);
 		  }
 
@@ -3487,7 +3511,7 @@ Window::paint_mode_line (HDC hdc)
 	  }
 
       r.right = w_ml_size.cx - 1;
-      ExtTextOut (hdc, r.left, 1 + app.modeline_param.m_exlead,
+      ExtTextOut (hdc, r.left, 1 + w_owner->modeline_param.m_exlead,
                   ETO_OPAQUE | ETO_CLIPPED, &r, b1, b - b1, 0);
     }
 
@@ -3563,7 +3587,7 @@ Window::redraw_mode_line ()
           w_inverse_mode_line = 0;
         }
     }
-  else if (w_inverse_mode_line != (selected_window () == this))
+  else if (w_inverse_mode_line != (selected_window (w_owner) == this))
     {
       w_disp_flags |= WDF_MODELINE;
       w_inverse_mode_line ^= 1;
@@ -3575,8 +3599,8 @@ Window::redraw_mode_line ()
 
   HDC hdc = GetDC (w_hwnd_ml);
   // a little slow. we can avoid this setup if we check validity.
-  w_point_painter.setup_paint(&app.modeline_param, w_column, w_plinenum, w_ml_size);
-  w_percent_painter.setup_paint(&app.modeline_param, mode_line_percent_painter::calc_percent(w_bufp, w_point.p_point), w_ml_size);
+  w_point_painter.setup_paint(&w_owner->modeline_param, w_column, w_plinenum, w_ml_size);
+  w_percent_painter.setup_paint(&w_owner->modeline_param, mode_line_percent_painter::calc_percent(w_bufp, w_point.p_point), w_ml_size);
 
   if (w_disp_flags & WDF_MODELINE
       || w_point_painter.need_repaint_all()
@@ -3599,7 +3623,7 @@ Window::redraw_mode_line ()
           ofg = SetTextColor (hdc, w_colors[WCOLOR_MODELINE_FG]);
           obg = SetBkColor (hdc, w_colors[WCOLOR_MODELINE_BG]);
         }
-      HGDIOBJ of = SelectObject (hdc, app.modeline_param.m_hfont);
+      HGDIOBJ of = SelectObject (hdc, w_owner->modeline_param.m_hfont);
 
 	  // order is not important.
 	  w_point_painter.update_paint(hdc);
@@ -3619,11 +3643,11 @@ Window::refresh (int f)
 {
   assert (IsWindow (w_hwnd));
 
-  if (!w_next && stringp (xsymbol_value (Vminibuffer_message)))
+  if (!w_next && stringp (w_owner->lminibuffer_message))
     {
       if (w_disp_flags & (WDF_WINDOW | WDF_PENDING))
         {
-          paint_minibuffer_message (xsymbol_value (Vminibuffer_message));
+          paint_minibuffer_message (w_owner->lminibuffer_message);
           w_disp_flags &= ~(WDF_WINDOW | WDF_PENDING);
         }
       return 0;
@@ -3718,28 +3742,28 @@ Window::pending_refresh ()
   if (w_point.p_point == w_last_point)
     {
 #ifdef DEBUG
-      if (w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+      if (get_fold_columns() == Buffer::FOLD_NONE)
         {
           assert (w_linenum == w_bufp->point_linenum (w_point));
           assert (w_column == w_bufp->point_column (w_point));
         }
       else
         {
-          assert (w_linenum == w_bufp->folded_point_linenum (w_point));
-          assert (w_column == w_bufp->folded_point_column (w_point));
+          assert (w_linenum == folded_point_linenum (w_point));
+          assert (w_column == folded_point_column (w_point));
         }
 #endif
     }
   else
     {
       w_last_point = w_point.p_point;
-      if (w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+      if (get_fold_columns() == Buffer::FOLD_NONE)
         {
           w_linenum = w_bufp->point_linenum (w_point);
           w_column = w_bufp->point_column (w_point);
         }
       else
-        w_linenum = w_bufp->folded_point_linenum_column (w_point, &w_column);
+        w_linenum = w_bufp->folded_point_linenum_column (w_point, get_fold_columns(), &w_column);
     }
 
   if (w_linenum < w_last_top_linenum)
@@ -3751,75 +3775,92 @@ Window::pending_refresh ()
     w_goal_column = w_column;
 }
 
+extern lisp get_default_menu(lisp app = Qnil);
+extern lisp get_last_active_menu(ApplicationFrame *app);
+extern lisp set_menu_to_apphash (ApplicationFrame* app1, lisp lmenu, lisp hashsym);
+
+
 void
 refresh_screen (int f)
 {
   Window::destroy_windows ();
-  if (app.active_frame.windows_moved)
-    Window::move_all_windows ();
+  int update_title_bar = 0;
+  for(ApplicationFrame *app1 = first_app_frame(); app1; app1= app1->a_next)
+  {
+	  if (app1->active_frame.windows_moved)
+		Window::move_all_windows (app1);
 
-  if (g_frame.modified ())
-    recalc_toplevel ();
+	  if (app1->mframe->modified ())
+		recalc_toplevel (app1);
 
-  lisp lmenu = (win32_menu_p (selected_buffer ()->lmenu)
-                ? selected_buffer ()->lmenu
-                : (win32_menu_p (xsymbol_value (Vdefault_menu))
-                   ? xsymbol_value (Vdefault_menu)
-                   : Qnil));
-  if (lmenu != xsymbol_value (Vlast_active_menu))
-    {
-      if (SetMenu (app.toplev, lmenu == Qnil ? 0 : xwin32_menu_handle (lmenu)))
-        {
-          DrawMenuBar (app.toplev);
+	  lisp lmenu = (win32_menu_p (selected_buffer (app1)->lmenu)
+					? selected_buffer (app1)->lmenu
+					: (win32_menu_p (get_default_menu(app1->lfp))
+					   ? get_default_menu(app1->lfp)
+					   : Qnil));
+	  if (lmenu != get_last_active_menu(app1))
+		{
+		  if (SetMenu (app1->toplev, lmenu == Qnil ? 0 : xwin32_menu_handle (lmenu)))
+			{
+			  DrawMenuBar (app1->toplev);
 #ifndef WINDOWBLINDS_FIXED // WindowBlinds‘Îô
-          if (lmenu == Qnil || xsymbol_value (Vlast_active_menu) == Qnil)
+          if (lmenu == Qnil || get_last_active_menu(app1) == Qnil)
             {
               RECT r;
-              GetWindowRect (app.toplev, &r);
+              GetWindowRect (app1->toplev, &r);
               int w = r.right - r.left;
               int h = r.bottom - r.top;
-              MoveWindow (app.toplev, r.left, r.top, w - 1, h - 1, 1);
-              MoveWindow (app.toplev, r.left, r.top, w, h, 1);
+              MoveWindow (app1->toplev, r.left, r.top, w - 1, h - 1, 1);
+              MoveWindow (app1->toplev, r.left, r.top, w, h, 1);
             }
 #endif /* WINDOWBLINDS_FIXED */
-          xsymbol_value (Vlast_active_menu) = lmenu;
-        }
-    }
+		  set_menu_to_apphash(app1, lmenu, Vlast_active_menu);
+           }
+	    }
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    UpdateWindow (wp->w_hwnd);
+	  Window *wp;
+	  for (wp = app1->active_frame.windows; wp; wp = wp->w_next)
+		UpdateWindow (wp->w_hwnd);
 
-  int update_title_bar = 0;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    if (wp->refresh (f) && wp == selected_window ())
-      update_title_bar = 1;
+	  for (wp = app1->active_frame.windows; wp; wp = wp->w_next)
+		if (wp->refresh (f) && wp == selected_window (app1))
+		  update_title_bar = 1;
 
-  app.stat_area.update ();
+	  app1->stat_area.update ();
+  }
 
-  for (Buffer *bp = Buffer::b_blist; bp; bp = bp->b_next)
-    {
-      bp->b_modified_region.p1 = -1;
-      bp->b_last_narrow_depth = bp->b_narrow_depth;
-    }
+  Buffer *bp;
+  for (bp = Buffer::b_blist; bp; bp = bp->b_next)
+	{
+	  bp->b_modified_region.p1 = -1;
+	  bp->b_last_narrow_depth = bp->b_narrow_depth;
+	}
 
+  for(ApplicationFrame *app1 = first_app_frame(); app1; app1= app1->a_next)
+  {
+	  if (f)
+		{
+		  bp = selected_buffer (app1);
+		  app1->mframe->update_ui ();
+		  bp->change_ime_mode (app1);
+		  bp->set_frame_title (app1, update_title_bar);
+		  if(app1 == &active_app_frame())
+			  bp->dlist_add_head ();
+		}
+  }
   if (f)
-    {
-      Buffer *bp = selected_buffer ();
-      g_frame.update_ui ();
-      bp->change_ime_mode ();
-      bp->set_frame_title (update_title_bar);
-      bp->dlist_add_head ();
-      Fundo_boundary ();
-    }
+    Fundo_boundary ();
 }
 
 void
 pending_refresh_screen ()
 {
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    wp->pending_refresh ();
+  for( ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next) {
+    for (Window *wp = app1->active_frame.windows; wp; wp = wp->w_next)
+      wp->pending_refresh ();
 
-  selected_buffer ()->dlist_add_head ();
+    selected_buffer (app1)->dlist_add_head ();
+  }
 }
 
 void
@@ -3861,17 +3902,17 @@ Window::winsize_changed (int w, int h)
 void
 Window::discard_invalid_region (const PAINTSTRUCT &ps, RECT &r)
 {
-  r.left = max (0L, ((ps.rcPaint.left - app.text_font.cell ().cx / 2)
-                     / app.text_font.cell ().cx));
+  r.left = max (0L, ((ps.rcPaint.left - w_owner->text_font.cell ().cx / 2)
+                     / w_owner->text_font.cell ().cx));
   r.right = min (w_ch_max.cx,
-                 ((ps.rcPaint.right + app.text_font.cell ().cx
-                   + app.text_font.cell ().cx / 2 - 1)
-                  / app.text_font.cell ().cx));
+                 ((ps.rcPaint.right + w_owner->text_font.cell ().cx
+                   + w_owner->text_font.cell ().cx / 2 - 1)
+                  / w_owner->text_font.cell ().cx));
   r.right = max (r.left, r.right);
-  r.top = max (0L, ps.rcPaint.top / app.text_font.cell ().cy);
+  r.top = max (0L, ps.rcPaint.top / w_owner->text_font.cell ().cy);
   r.bottom = min (w_ch_max.cy,
-                  ((ps.rcPaint.bottom + app.text_font.cell ().cy - 1)
-                   / app.text_font.cell ().cy));
+                  ((ps.rcPaint.bottom + w_owner->text_font.cell ().cy - 1)
+                   / w_owner->text_font.cell ().cy));
   r.bottom = max (r.top, r.bottom);
 
   glyph_data **og = w_glyphs.g_rep->gr_oglyph;
@@ -3922,20 +3963,21 @@ Window::update_window ()
       paint_cursor_line (0, 1);
     }
   if (this == selected_window ()
-      && !app.ime_composition
-      && GetFocus () == app.toplev)
+      && !w_owner->ime_composition
+      && GetFocus () == w_owner->toplev)
     update_caret ();
 }
 
 lisp
 Frefresh_screen (lisp f)
 {
+  all_window_iterator itr;
   if (!f || f == Qnil)
     refresh_screen (0);
   else if (f != Qt)
     refresh_screen (1);
   else
-    for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+    for (Window *wp = itr.begin(); wp; wp = itr.next())
       wp->w_disp_flags |= Window::WDF_WINDOW;
   return Qt;
 }

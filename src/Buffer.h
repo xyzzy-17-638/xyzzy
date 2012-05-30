@@ -48,37 +48,29 @@ struct Buffer;
 
 class syntax_info;
 
-struct Chunk
-{
-  enum {TEXT_SIZE = 4096};
-  enum {BREAKS_SIZE = (TEXT_SIZE + 7) / 8};
-  static fixed_heap c_heap;
-  static fixed_heap c_breaks_heap;
-  static const u_char c_breaks_mask[];
+#define CHUNK_TEXT_SIZE 4096
+// #define CHUNK_FOLD_BREAK_SIZE ((CHUNK_TEXT_SIZE + 7) / 8)
 
-  Chunk *c_prev;
-  Chunk *c_next;
-  Char *c_text;
-  u_char *c_breaks;
-  short c_used;
-  short c_nlines;
+struct ChunkFoldInfo
+{
+  static const u_char c_breaks_mask[];
+  enum {BREAKS_SIZE = (CHUNK_TEXT_SIZE + 7) / 8};
+
+  ChunkFoldInfo() {
+	  c_nbreaks = -1;
+	  bzero (c_breaks, BREAKS_SIZE);
+	  c_first_eol = -1;
+	  c_last_eol = -1;
+  }
+
   short c_nbreaks;
   short c_first_eol;
   short c_last_eol;
-  Char c_bstrch;
-  Char c_estrch;
-  u_char c_bstate;
-  u_char c_estate;
+  u_char c_breaks[BREAKS_SIZE];
 
-  void update_syntax (const syntax_info &);
-  void parse_syntax ();
-
-  int count_lines () const;
-  int rest () const;
-  void clear ();
-  void clear_breaks ()
+  void clear_breaks (short used)
     {
-      bzero (c_breaks, (c_used + 7) / 8);
+      bzero (c_breaks, (used + 7) / 8);
       c_nbreaks = 0;
     }
   void break_on (int n)
@@ -94,6 +86,101 @@ struct Chunk
       c_nbreaks--;
     }
   u_char break_p (int n) const {return c_breaks[n >> 3] & c_breaks_mask[n & 7];}
+};
+
+struct Chunk
+{
+  enum {TEXT_SIZE = CHUNK_TEXT_SIZE};
+  enum {BREAKS_SIZE = (TEXT_SIZE + 7) / 8};
+  enum {SPECIAL = 0x7FFF };
+  static fixed_heap c_heap;
+  static fixed_heap c_breaks_heap;
+  static const u_char c_breaks_mask[];
+
+  Chunk *c_prev;
+  Chunk *c_next;
+  Char *c_text;
+
+
+  // std::map<int fold_columns, ChunkFoldInfo> *, but I don't want to include here.
+  // Key should have been const Window*, but all the upper layer pass just fold_columns.
+  // Logically, fold_columns is only the factor that this infomation should be sorted, so no problem.
+  void *c_fold_map;
+  short c_default_nbreaks;
+
+  short c_used;
+  short c_nlines;
+  Char c_bstrch;
+  Char c_estrch;
+  u_char c_bstate;
+  u_char c_estate;
+
+  void update_syntax (const syntax_info &);
+  void parse_syntax ();
+
+  int count_lines () const;
+  int rest () const;
+  void clear ();
+
+  void ensure_fold_info(int fold_columns);
+  ChunkFoldInfo& find_fold_info(int fold_columns) const;
+  bool fold_info_exist(int fold_columns) const;
+
+  void invalidate_fold_info();
+
+  /*
+  short c_nbreaks; // tmp
+  short c_first_eol; // tmp
+  short c_last_eol; // tmp
+  */
+  void set_nbreaks(int fold_columns, short nbreaks) {
+	ensure_fold_info(fold_columns);
+	find_fold_info(fold_columns).c_nbreaks = nbreaks;
+  }
+  short get_nbreaks(int fold_columns) const {
+	if(!fold_info_exist(fold_columns))
+	  return c_default_nbreaks;
+	return find_fold_info(fold_columns).c_nbreaks;
+  }
+  void set_first_eol(int fold_columns, short feol) {
+	ensure_fold_info(fold_columns);
+	find_fold_info(fold_columns).c_first_eol = feol;
+  }
+  short get_first_eol(int fold_columns) const {
+	if(!fold_info_exist(fold_columns))
+	  return -1;
+	return find_fold_info(fold_columns).c_first_eol;
+  }
+  void set_last_eol(int fold_columns, short leol) {
+	ensure_fold_info(fold_columns);
+	find_fold_info(fold_columns).c_last_eol = leol;
+  }
+  short get_last_eol(int fold_columns) {
+	if(!fold_info_exist(fold_columns))
+	  return -1;
+	return find_fold_info(fold_columns).c_last_eol;
+  }
+
+  void clear_breaks (int fold_columns)
+  {
+	ensure_fold_info(fold_columns);
+	find_fold_info(fold_columns).clear_breaks(c_used);
+  }
+  void break_on(int fold_columns, int n)
+  {
+	ensure_fold_info(fold_columns);
+	find_fold_info(fold_columns).break_on(n);
+  }
+  void break_off (int fold_columns, int n)
+  {
+	ensure_fold_info(fold_columns);
+	find_fold_info(fold_columns).break_off(n);
+  }
+  u_char break_p (int fold_columns, int n) const {
+	if(!fold_info_exist(fold_columns))
+		return 0;
+	return find_fold_info(fold_columns).break_p(n);
+  }
 };
 
 inline int
@@ -192,7 +279,7 @@ inline Char
 Point::ch () const
 {
   assert (p_chunk);
-  assert (p_offset >= 0 && p_offset < p_chunk->c_used);
+  assert (p_offset >= 0 && (p_chunk->c_used == Chunk::SPECIAL || p_offset < p_chunk->c_used));
   return p_chunk->c_text[p_offset];
 }
 
@@ -200,7 +287,7 @@ inline Char &
 Point::ch ()
 {
   assert (p_chunk);
-  assert (p_offset >= 0 && p_offset < p_chunk->c_used);
+  assert (p_offset >= 0 && (p_chunk->c_used == Chunk::SPECIAL || p_offset < p_chunk->c_used));
   return p_chunk->c_text[p_offset];
 }
 
@@ -347,6 +434,9 @@ struct write_region_param
 
 struct glyph_width;
 
+#include <map>
+
+
 struct Buffer
 {
   static Buffer *b_blist;
@@ -364,7 +454,6 @@ struct Buffer
   Chunk *b_chunke;
   long b_nchars;
   long b_nlines;
-  long b_nfolded;
 
   textprop_heap b_textprop_heap;
   textprop *b_textprop;
@@ -381,8 +470,8 @@ struct Buffer
   static long b_total_create_count;
   long b_create_count;
 
-  static Buffer *b_last_title_bar_buffer;
-  static int b_title_bar_text_order;
+  static std::map<ApplicationFrame*,int> b_title_bar_text_order_map;
+  static std::map<ApplicationFrame*,Buffer*> b_last_title_bar_buffer_map;
 
   eol_code b_eol_code;
 
@@ -404,18 +493,10 @@ struct Buffer
   selection_type b_reverse_temp;
   Region b_reverse_region;
 
-  enum
-    {
-      BUFFER_BAR_MODIFIED = 1,
-      BUFFER_BAR_CREATED = 2,
-      BUFFER_BAR_DELETED = 4,
-      BUFFER_BAR_LAST_MODIFIED_FLAG = 8,
-      BUFFER_BAR_MARK = 16
-    };
   COLORREF b_buffer_bar_fg;
   COLORREF b_buffer_bar_bg;
-  static u_char b_buffer_bar_modified_any;
-  u_char b_buffer_bar_modified;
+  static int b_last_modified_version_number;
+  int b_modified_version;
   u_char b_truncated;
   u_char b_modified;
   long b_modified_count;
@@ -477,10 +558,29 @@ struct Buffer
   int b_hjump_columns;
 
   static int b_default_fold_mode;
-  int b_fold_columns;  // ê‹ÇËï‘ÇµÉJÉâÉÄ(-1: ÇµÇ»Ç¢)
   enum {FOLD_DEFAULT = -2, FOLD_NONE = -1, FOLD_WINDOW = 0};
   int b_fold_mode;
+  int b_fold_columns;
 
+  // don't want to include STL inside header.
+  // std::map<const Window*, int>*
+  void *fold_map;
+  bool fold_columns_exist(const Window* win) const;
+
+  // ?U?e?O?É ?J???Ä(-1: ?É ?E?Åë)
+  int get_fold_columns(const Window* win) const ;
+  int get_first_fold_columns() const ;
+  void set_fold_columns(Window* win, int column);
+
+  // don't want to include STL inside header.
+  // std::map<int fold_column, long nfolded>*
+  void *nfolded_map;
+  bool nfolded_exist(int fold_columns) const;
+  long get_nfolded(int fold_columns) const;
+  void set_nfolded(int fold_columns, long nfolded);
+  void set_nfolded_all(long nfolded);
+  long b_default_nfolded;
+  
   enum {LNMODE_DEFAULT, LNMODE_DISP, LNMODE_LF};
   static int b_default_linenum_mode;
   int b_linenum_mode;
@@ -523,6 +623,7 @@ struct Buffer
   int kinsoku_shorten_limit () const {return (b_kinsoku_shorten_limit < 0
                                               ? b_default_kinsoku_shorten_limit
                                               : b_kinsoku_shorten_limit);}
+
 
   int b_tab_columns;
   int b_local_tab_columns;
@@ -692,15 +793,15 @@ struct Buffer
   void modify_mode_line () const;
   void modify_buffer_bar ()
     {
-      b_buffer_bar_modified |= BUFFER_BAR_MODIFIED;
-      b_buffer_bar_modified_any |= BUFFER_BAR_MODIFIED;
+	  b_modified_version = ++Buffer::b_last_modified_version_number;
     }
   static void maybe_modify_buffer_bar ()
-    {b_buffer_bar_modified_any |= BUFFER_BAR_MODIFIED;}
+    {
+  	  ++Buffer::b_last_modified_version_number;
+    }
   void buffer_bar_created ()
     {
-      b_buffer_bar_modified |= BUFFER_BAR_CREATED;
-      b_buffer_bar_modified_any |= BUFFER_BAR_CREATED;
+	  b_modified_version = ++Buffer::b_last_modified_version_number;
     }
   static int count_modified_buffers ();
   static int query_kill_xyzzy ();
@@ -764,37 +865,39 @@ struct Buffer
   int unlock_file ();
   int file_locked_p () const;
 
-  void refresh_title_bar () const;
-  void set_frame_title (int);
+  void refresh_title_bar (ApplicationFrame*) const;
+  void set_frame_title (ApplicationFrame*, int);
+  static void remove_application_frame_cache (ApplicationFrame*);
   char *store_title (lisp, char *, char *) const;
 
   void change_colors (const XCOLORREF *);
 
   long char_columns (Char, long) const;
 
-  long folded_point_linenum (point_t) const;
-  long folded_point_linenum (const Point &point) const
-    {return folded_point_linenum (point.p_point);}
-  long folded_linenum_point (Point &, long);
-  long folded_count_lines ();
-  long folded_point_column (const Point &) const;
-  long folded_point_linenum_column (point_t, long *) const;
-  long folded_point_linenum_column (const Point &point, long *columnp) const
-    {return folded_point_linenum_column (point.p_point, columnp);}
-  void folded_go_bol (Point &) const;
-  void folded_go_eol (Point &) const;
-  long folded_forward_column (Point &, long, long, int, int) const;
-  void folded_goto_bol (Point &) const;
-  void folded_goto_eol (Point &) const;
-  int folded_forward_line (Point &, long);
-  long folded_goto_column (Point &, long, int) const;
+  long folded_point_linenum (point_t, int fold_columns) const;
+  long folded_point_linenum (const Point &point, int fold_columns) const
+    {return folded_point_linenum (point.p_point, fold_columns);}
+  long folded_linenum_point (Point &, int fold_columns, long);
+  long folded_count_lines (int fold_columns);
+  long folded_point_column (const Point &, int fold_columns) const;
+  long folded_point_linenum_column (point_t, int fold_columns, long *) const;
+  long folded_point_linenum_column (const Point &point, int fold_columns, long *columnp) const
+    {return folded_point_linenum_column (point.p_point, fold_columns, columnp);}
+  void folded_go_bol (Point &, int fold_columns) const;
+  void folded_go_eol (Point &, int fold_columns) const;
+  long folded_forward_column (Point &, int fold_columns, long, long, int, int) const;
+  void folded_goto_bol (Point &, int fold_columns) const;
+  void folded_goto_eol (Point &, int fold_columns) const;
+  int folded_forward_line (Point &, int fold_columns, long);
+  long folded_goto_column (Point &, int fold_columns, long, int) const;
 
   void init_fold_width (int);
+  bool init_fold_width_with_window (Window*, int);
   void window_size_changed ();
 
   void check_range (Point &) const;
 
-  void change_ime_mode ();
+  void change_ime_mode (ApplicationFrame* app);
   void upcase_region_internal (Point &, point_t);
   void downcase_region_internal (Point &, point_t);
   void capitalize_region_internal (Point &, point_t);
@@ -804,9 +907,7 @@ struct Buffer
   void fold_width_modified ();
 
   int parse_fold_line (Point &, long, const fold_parameter &) const;
-  int parse_fold_line (Point &point, const fold_parameter &param) const
-    {return parse_fold_line (point, b_fold_columns, param);}
-  void parse_fold_chunk (Chunk *) const;
+  void parse_fold_chunk (Chunk *, int fold_columns) const;
   int parse_fold_line (Point &, long, const glyph_width &,
                        const fold_parameter &) const;
 
@@ -816,9 +917,9 @@ struct Buffer
       Chunk *cp;
       long linenum;
     };
-  void update_fold_chunk (point_t, update_fold_info &) const;
-  void folded_go_bol_1 (Point &) const;
-  long folded_point_column_1 (point_t, const update_fold_info &) const;
+  void update_fold_chunk (point_t, int fold_columns, update_fold_info &) const;
+  void folded_go_bol_1 (Point &, int fold_columns) const;
+  long folded_point_column_1 (point_t, int fold_columns, const update_fold_info &) const;
   long folded_point_column_1 (point_t, Point &) const;
 
   int check_hook (lisp, lisp &) const;

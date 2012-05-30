@@ -10,6 +10,7 @@
 (export '(global-set-key local-set-key undefine-key global-unset-key local-unset-key
 	  ctl-x-map ctl-x-prefix esc-map meta-prefix
 	  spec-map specific-command-prefix ctl-x-4-map ctl-x-4-prefix
+	  ctl-x-5-map ctl-x-5-prefix
 	  copy-keymap describe-bindings *full-keymap-length*
 	  substitute-key-definition))
 
@@ -24,6 +25,10 @@
 
 (defvar ctl-x-4-map (make-sparse-keymap))
 (setf (symbol-function 'ctl-x-4-prefix) ctl-x-4-map)
+
+(defvar ctl-x-5-map (make-sparse-keymap))
+(setf (symbol-function 'ctl-x-5-prefix) ctl-x-5-map)
+
 
 (defun copy-keymap (map)
   (if (consp map)

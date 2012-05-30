@@ -1827,6 +1827,8 @@ static lisp
 parser (lisp stream, lisp recursive_p, int preserve_white)
 {
   enable_quit eq;
+  defer_change_focus dcf;
+
   dynamic_bind dynb (Vreader_preserve_white,
                      xsymbol_value (Vreader_preserve_white));
   if (preserve_white)
@@ -2114,6 +2116,7 @@ load_file (lisp filename, lisp realname, lisp if_does_not_exist,
                                    if_does_not_exist, Kcanonical, 0);
       if (stream == Qnil)
         return Qnil;
+      check_stream_utf_bom(stream);
     }
 
   Char buf[PATH_MAX * 2], *b = buf;
@@ -2134,7 +2137,7 @@ load_file (lisp filename, lisp realname, lisp if_does_not_exist,
           b += l;
         }
       b = a2w (b, "...\n");
-      app.status_window.puts (buf, b - buf);
+      active_app_frame().status_window.puts (buf, b - buf);
       b--;
     }
 
@@ -2163,7 +2166,7 @@ load_file (lisp filename, lisp realname, lisp if_does_not_exist,
   if (verbose)
     {
       b = a2w (b, "done\n");
-      app.status_window.puts (buf, b - buf);
+      active_app_frame().status_window.puts (buf, b - buf);
     }
 
   return Qt;

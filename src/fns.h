@@ -82,14 +82,15 @@ LRESULT CALLBACK frame_wndproc (HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK client_wndproc (HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK modeline_wndproc (HWND, UINT, WPARAM, LPARAM);
 void main_loop ();
-int start_quit_thread ();
+class ApplicationFrame;
+int start_quit_thread (ApplicationFrame* app1);
 int wait_process_terminate (HANDLE);
 lisp execute_string (lisp);
-int end_wait_cursor (int);
-void set_ime_caret ();
-void recalc_toplevel ();
-void set_caret_blink_time ();
-void restore_caret_blink_time ();
+int end_wait_cursor (int, ApplicationFrame *app1 = NULL);
+void set_ime_caret (ApplicationFrame*);
+void recalc_toplevel (ApplicationFrame*);
+void set_caret_blink_time (ApplicationFrame *);
+void restore_caret_blink_time (ApplicationFrame*);
 void toplev_gc_mark (void (*)(lisp));
 int toplev_accept_mouse_move_p ();
 
@@ -111,7 +112,7 @@ const char *function_Char2name (Char);
 const char *standard_Char2name (Char);
 
 /* process.cc */
-void read_process_output (WPARAM, LPARAM);
+void read_process_output (ApplicationFrame *,WPARAM, LPARAM);
 void wait_process_terminate (WPARAM, LPARAM);
 int buffer_has_process (const Buffer *);
 int query_kill_subprocesses ();
@@ -119,8 +120,8 @@ void process_gc_mark (void (*)(lisp));
 
 /* menu.cc */
 int init_menu_flags (lisp);
-void init_menu_popup (WPARAM, LPARAM);
-lisp lookup_menu_command (int);
+void init_menu_popup (ApplicationFrame*, WPARAM, LPARAM);
+lisp lookup_menu_command (ApplicationFrame*, int);
 lisp track_popup_menu (lisp, lisp, const POINT *);
 
 /* dialogs.cc */

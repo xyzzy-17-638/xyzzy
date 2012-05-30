@@ -5,19 +5,73 @@
 
 class ArchiverP
 {
-public:
-  const ArchiverInterface &ar_interface;
   const char *const *const ar_csuffixes;
   const char *const *const ar_esuffixes;
   const char *const *const ar_rsuffixes;
-protected:
+
+public:
+  ArchiverP (const char *const *csuffixes,
+             const char *const *esuffixes,
+             const char *const *rsuffixes)
+       : ar_csuffixes (csuffixes),
+         ar_esuffixes (esuffixes), ar_rsuffixes (rsuffixes) {}
   static const char *const null_suffixes[];
-  ArchiverP (const ArchiverInterface &i,
+
+  virtual int check_archive (const char *) const = 0;
+  virtual int extract (HWND, const char *, const char *, const char *) const = 0;
+  virtual   WORD get_version () const = 0;
+  virtual   WORD get_sub_version () const = 0;
+  virtual BOOL config_dialog (HWND hwnd, LPSTR buf, int mode) const = 0;
+  virtual lisp list (const char *path, int file_name_only) const = 0;
+  virtual void puts_extract (FILE *, char *) const = 0;
+
+  virtual int create (HWND, const char *, const char *) const =0;
+  virtual int create_sfx (HWND, const char *, const char *) const = 0;
+  virtual void puts_create (FILE *, char *, const char *) const = 0;
+  virtual int remove (HWND, const char *, const char *) const = 0;
+
+  // default implementation
+  int match_csuffix (const char *path, int l) const
+    {return match_suffix (path, l, ar_csuffixes);}
+  int match_esuffix (const char *path, int l) const
+    {return match_suffix (path, l, ar_esuffixes);}
+  int match_rsuffix (const char *path, int l) const
+    {return match_suffix (path, l, ar_rsuffixes);}
+  int match_suffix (const char *, int, const char *const *) const;
+  virtual int reliable_checker_p () const {return 1;}
+};
+
+class UnzipBuiltin: public ArchiverP
+{
+  static const char *const esuffixes[];
+public:
+  UnzipBuiltin () : ArchiverP (null_suffixes, esuffixes, null_suffixes) {}
+  virtual int check_archive (const char *) const ;
+  virtual int extract (HWND, const char *, const char *, const char *) const ;
+  virtual   WORD get_version () const ;
+  virtual   WORD get_sub_version () const ;
+  virtual BOOL config_dialog (HWND hwnd, LPSTR buf, int mode) const ;
+  virtual lisp list (const char *path, int file_name_only) const ;
+  virtual void puts_extract (FILE *, char *) const ;
+
+  virtual int create (HWND, const char *, const char *) const {return ERROR_NOT_SUPPORT; }
+  virtual int create_sfx (HWND, const char *, const char *) const {return ERROR_NOT_SUPPORT; }
+  virtual void puts_create (FILE *, char *, const char *) const;
+  virtual int remove (HWND, const char *, const char *) const {return ERROR_NOT_SUPPORT; }
+
+};
+
+
+class ArchiverPCommonArchiverImpl : public ArchiverP
+{
+public:
+  const ArchiverInterface &ar_interface;
+protected:
+  ArchiverPCommonArchiverImpl (const ArchiverInterface &i,
              const char *const *csuffixes,
              const char *const *esuffixes,
              const char *const *rsuffixes)
-       : ar_interface (i), ar_csuffixes (csuffixes),
-         ar_esuffixes (esuffixes), ar_rsuffixes (rsuffixes) {}
+       : ar_interface (i), ArchiverP(csuffixes, esuffixes, rsuffixes) {}
   int doit (HWND, const char *) const;
   int extract (HWND, const char *) const;
   int extract_noresp (HWND, const char *, int, const char *) const;
@@ -29,12 +83,13 @@ protected:
   int create1 (HWND, const char *, const char *, const char *, const char *, char *) const;
   int remove (HWND, const char *, const char *, const char *, const char *) const;
   int create_sfx (HWND, const char *, const char *, const char *) const;
+
   static void sepmap (char *, int, int);
   static void sepsl (char *path) {sepmap (path, '\\', '/');}
   static void sepbacksl (char *path) {sepmap (path, '/', '\\');}
 public:
+  virtual const char *match_any () const {return "";}
   virtual int check_archive (const char *) const;
-  virtual int reliable_checker_p () const {return 1;}
   virtual int extract (HWND, const char *, const char *, const char *) const
     {return ERROR_NOT_SUPPORT;}
   virtual int create (HWND, const char *, const char *) const
@@ -43,56 +98,53 @@ public:
     {return ERROR_NOT_SUPPORT;}
   virtual int remove (HWND, const char *, const char *) const
     {return ERROR_NOT_SUPPORT;}
-  int match_suffix (const char *, int, const char *const *) const;
-  int match_csuffix (const char *path, int l) const
-    {return match_suffix (path, l, ar_csuffixes);}
-  int match_esuffix (const char *path, int l) const
-    {return match_suffix (path, l, ar_esuffixes);}
-  int match_rsuffix (const char *path, int l) const
-    {return match_suffix (path, l, ar_rsuffixes);}
   virtual void puts_create (FILE *, char *, const char *) const;
   virtual void puts_extract (FILE *, char *) const;
-  virtual const char *match_any () const {return "";}
   virtual int post_open (HARC harc) const {return 0;}
+
+  virtual   WORD get_version () const;
+  virtual   WORD get_sub_version () const;
+  virtual BOOL config_dialog (HWND hwnd, LPSTR buf, int mode) const;
+  virtual lisp list (const char *path, int file_name_only) const;
 };
 
-class Ish: public ArchiverP
+class Ish: public ArchiverPCommonArchiverImpl
 {
   IshInterface ish;
   static const char *const suffixes[];
 public:
-  Ish () : ArchiverP (ish, suffixes, suffixes, null_suffixes) {}
+  Ish () : ArchiverPCommonArchiverImpl (ish, suffixes, suffixes, null_suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
   virtual int reliable_checker_p () const {return 0;}
 };
 
-class Tar: public ArchiverP
+class Tar: public ArchiverPCommonArchiverImpl
 {
   TarInterface tar;
   static const char *const suffixes[];
 public:
-  Tar () : ArchiverP (tar, suffixes, suffixes, null_suffixes) {}
+  Tar () : ArchiverPCommonArchiverImpl (tar, suffixes, suffixes, null_suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
   virtual int create (HWND, const char *, const char *) const;
   virtual void map_sl (char *path) const {sepsl (path);}
 };
 
-class Arj: public ArchiverP
+class Arj: public ArchiverPCommonArchiverImpl
 {
   UnarjInterface arj;
   static const char *const suffixes[];
 public:
-  Arj () : ArchiverP (arj, suffixes, suffixes, null_suffixes) {}
+  Arj () : ArchiverPCommonArchiverImpl (arj, suffixes, suffixes, null_suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
 };
 
-class Lha: public ArchiverP
+class Lha: public ArchiverPCommonArchiverImpl
 {
   UnlhaInterface lha;
   static const char *const csuffixes[];
   static const char *const esuffixes[];
 public:
-  Lha () : ArchiverP (lha, csuffixes, esuffixes, csuffixes) {}
+  Lha () : ArchiverPCommonArchiverImpl (lha, csuffixes, esuffixes, csuffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
   virtual int check_archive (const char *) const;
   virtual int create (HWND, const char *, const char *) const;
@@ -102,90 +154,92 @@ public:
   virtual const char *match_any () const {return "*.*";}
 };
 
-class Unzip: public ArchiverP
+
+class Unzip: public ArchiverPCommonArchiverImpl
 {
   UnzipInterface unzip;
   static const char *const esuffixes[];
 public:
-  Unzip () : ArchiverP (unzip, null_suffixes, esuffixes, null_suffixes) {}
+  Unzip () : ArchiverPCommonArchiverImpl (unzip, null_suffixes, esuffixes, null_suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
   virtual void map_sl (char *path) const {sepsl (path);}
   virtual void puts_extract (FILE *, char *) const;
 };
 
-class Zip: public ArchiverP
+
+class Zip: public ArchiverPCommonArchiverImpl
 {
   ZipInterface zip;
   const Unzip &unzip;
   static const char *const csuffixes[];
 public:
   Zip (const Unzip &unzip_)
-       : ArchiverP (zip, csuffixes, null_suffixes, csuffixes), unzip (unzip_) {}
+       : ArchiverPCommonArchiverImpl (zip, csuffixes, null_suffixes, csuffixes), unzip (unzip_) {}
   virtual int create (HWND, const char *, const char *) const;
   virtual int remove (HWND, const char *, const char *) const;
   virtual int check_archive (const char *) const;
   virtual void puts_create (FILE *, char *, const char *) const;
 };
 
-class Cab: public ArchiverP
+class Cab: public ArchiverPCommonArchiverImpl
 {
   CabInterface cab;
   static const char *const csuffixes[];
   static const char *const esuffixes[];
 public:
-  Cab () : ArchiverP (cab, csuffixes, esuffixes, null_suffixes) {}
+  Cab () : ArchiverPCommonArchiverImpl (cab, csuffixes, esuffixes, null_suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
   virtual int create (HWND, const char *, const char *) const;
 };
 
-class Unrar: public ArchiverP
+class Unrar: public ArchiverPCommonArchiverImpl
 {
   UnrarInterface unrar;
   static const char *const esuffixes[];
 public:
-  Unrar () : ArchiverP (unrar, null_suffixes, esuffixes, null_suffixes) {}
+  Unrar () : ArchiverPCommonArchiverImpl (unrar, null_suffixes, esuffixes, null_suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
 };
 
-class Bga: public ArchiverP
+class Bga: public ArchiverPCommonArchiverImpl
 {
   BgaInterface bga;
   static const char *const suffixes[];
 public:
-  Bga () : ArchiverP (bga, suffixes, suffixes, suffixes) {}
+  Bga () : ArchiverPCommonArchiverImpl (bga, suffixes, suffixes, suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
   virtual int create (HWND, const char *, const char *) const;
   virtual int remove (HWND, const char *, const char *) const;
   virtual const char *match_any () const {return "*.*";}
 };
 
-class Yz1: public ArchiverP
+class Yz1: public ArchiverPCommonArchiverImpl
 {
   Yz1Interface yz1;
   static const char *const suffixes[];
 public:
-  Yz1 () : ArchiverP (yz1, suffixes, suffixes, null_suffixes) {}
+  Yz1 () : ArchiverPCommonArchiverImpl (yz1, suffixes, suffixes, null_suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
   virtual int create (HWND, const char *, const char *) const;
   virtual int post_open (HARC harc) const
     {return yz1.set_default_passwd (harc, 0);}
 };
 
-class UnGCA: public ArchiverP
+class UnGCA: public ArchiverPCommonArchiverImpl
 {
   UnGCAInterface ungca;
   static const char *const esuffixes[];
 public:
-  UnGCA () : ArchiverP (ungca, null_suffixes, esuffixes, null_suffixes) {}
+  UnGCA () : ArchiverPCommonArchiverImpl (ungca, null_suffixes, esuffixes, null_suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
 };
 
-class SevenZip: public ArchiverP
+class SevenZip: public ArchiverPCommonArchiverImpl
 {
   SevenZipInterface seven_zip;
   static const char *const suffixes[];
 public:
-  SevenZip () : ArchiverP (seven_zip, suffixes, suffixes, suffixes) {}
+  SevenZip () : ArchiverPCommonArchiverImpl (seven_zip, suffixes, suffixes, suffixes) {}
   virtual int extract (HWND, const char *, const char *, const char *) const;
   virtual int create (HWND, const char *, const char *) const;
   virtual int remove (HWND, const char *, const char *) const;
@@ -200,6 +254,7 @@ protected:
   Arj a_arj;
   Lha a_lha;
   Unzip a_unzip;
+  UnzipBuiltin a_unzip_bulitin;
   Zip a_zip;
   Cab a_cab;
   Unrar a_unrar;
@@ -207,7 +262,7 @@ protected:
   Yz1 a_yz1;
   UnGCA a_ungca;
   SevenZip a_seven_zip;
-  enum {NARCS = 12};
+  enum {NARCS = 13};
   ArchiverP *arcs[NARCS];
 
   static int check_file_size (const char *);

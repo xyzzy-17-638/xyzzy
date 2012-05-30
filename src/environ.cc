@@ -866,10 +866,10 @@ environ::save_geometry ()
     {
       WINDOWPLACEMENT w;
       w.length = sizeof w;
-      if (GetWindowPlacement (app.toplev, &w))
+      if (GetWindowPlacement (active_app_frame().toplev, &w))
         {
           RECT r;
-          if (save_window_snap_size && w.showCmd == SW_SHOWNORMAL && GetWindowRect (app.toplev, &r))
+          if (save_window_snap_size && w.showCmd == SW_SHOWNORMAL && GetWindowRect (active_app_frame().toplev, &r))
             {
               w.rcNormalPosition.left = r.left;
               w.rcNormalPosition.top = r.top;
@@ -983,7 +983,7 @@ Fuser_config_path ()
 lisp
 Fxyzzy_ini_path ()
 {
-  return make_string (app.ini_file_path);
+  return make_string (g_app.ini_file_path);
 }
 
 lisp

@@ -7,10 +7,10 @@ const char dock_bar::b_dock_bar_prop[] = "dock_bar::prop";
 char dock_bar::b_ttbuf[TTBUFSIZE];
 const char tab_bar::b_tab_bar_spin_prop[] = "tab_bar::spin::prop";
 
-dock_bar::dock_bar (dock_frame &frame, lisp name, int dockable)
+dock_bar::dock_bar (ApplicationFrame *app, dock_frame &frame, lisp name, int dockable)
      : b_hwnd (0), b_wndproc (0), b_frame (frame), b_lname (name),
        b_edge (EDGE_TOP), b_border (BORDER_ALL),
-       b_dockable (dockable), b_status (0)
+       b_dockable (dockable), b_status (0), b_app_frame(app)
 {
 }
 
@@ -214,7 +214,7 @@ dock_bar::wndproc (UINT msg, WPARAM wparam, LPARAM lparam)
       return HTCLIENT;
 
     case WM_LBUTTONDOWN:
-      if (!app.kbdq.idlep ())
+      if (!b_app_frame->kbdq.idlep ())
         return 0;
       if (lbtn_down (short (LOWORD (lparam)), short (HIWORD (lparam))))
         return 0;
@@ -233,12 +233,12 @@ dock_bar::wndproc (UINT msg, WPARAM wparam, LPARAM lparam)
     case WM_XBUTTONDBLCLK:
     case WM_MOUSEMOVE:
     case WM_MOUSEWHEEL:
-      if (!app.kbdq.idlep ())
+      if (!b_app_frame->kbdq.idlep ())
         return 0;
       break;
 
     case WM_KEYDOWN:
-      if (!app.kbdq.idlep ())
+      if (!b_app_frame->kbdq.idlep ())
         return 0;
       switch (wparam)
         {
@@ -260,7 +260,7 @@ dock_bar::wndproc (UINT msg, WPARAM wparam, LPARAM lparam)
       break;
 
     case WM_CONTEXTMENU:
-      if (!app.kbdq.idlep ())
+      if (!b_app_frame->kbdq.idlep ())
         return 0;
       if (HWND (wparam) == b_hwnd)
         {
@@ -283,8 +283,8 @@ dock_bar::wndproc (UINT msg, WPARAM wparam, LPARAM lparam)
   return sendmsg (msg, wparam, lparam);
 }
 
-tool_bar::tool_bar (dock_frame &frame, lisp name)
-     : dock_bar (frame, name, DOCKABLE_ALL), t_bm (0)
+tool_bar::tool_bar (ApplicationFrame *app, dock_frame &frame, lisp name)
+     : dock_bar (app, frame, name, DOCKABLE_ALL), t_bm (0)
 {
   t_bitmap_size.cx = 16;
   t_bitmap_size.cy = 15;
@@ -335,7 +335,7 @@ tool_bar::create (HWND hwnd_parent, DWORD style, UINT id)
 {
   if (!dock_bar::create (0, TOOLBARCLASSNAME, 0,
                          style, 0, 0, 0, 0, hwnd_parent,
-                         (HMENU)id, app.hinst, 0))
+                         (HMENU)id, b_app_frame->hinst, 0))
     return 0;
   sendmsg (TB_BUTTONSTRUCTSIZE, sizeof (TBBUTTON), 0);
   return 1;
@@ -461,8 +461,8 @@ tool_bar::dock_edge ()
     }
 }
 
-tab_bar::tab_bar (dock_frame &frame, lisp name)
-     : dock_bar (frame, name,
+tab_bar::tab_bar (ApplicationFrame *app, dock_frame &frame, lisp name)
+     : dock_bar (app, frame, name,
                  new_comctl_p () ? DOCKABLE_ALL : DOCKABLE_TOP | DOCKABLE_BOTTOM),
        t_tab_height (21), t_horz_width (60), t_horz_height (21)
 {
@@ -522,7 +522,7 @@ tab_bar::modify_spin ()
   HWND hwnd = CreateWindowEx (GetWindowLong (hwnd_spin, GWL_EXSTYLE),
                               UPDOWN_CLASS, "", (style ^ UDS_HORZ) & ~UDS_WRAP,
                               0, 0, 0, 0, b_hwnd, HMENU (IDC_TAB_SPIN),
-                              app.hinst, 0);
+                              b_app_frame->hinst, 0);
   if (!hwnd)
     return;
 
@@ -1215,7 +1215,7 @@ tab_bar::adjust_gripper (HDC hdc, RECT &wr, const RECT &cr) const
 int
 tab_bar::set_cursor (WPARAM wparam, LPARAM lparam)
 {
-  if (app.kbdq.idlep () && HWND (wparam) == b_hwnd
+  if (b_app_frame->kbdq.idlep () && HWND (wparam) == b_hwnd
       && t_horz_text && dock_vert_p ())
     {
       POINT p;
@@ -1236,7 +1236,7 @@ tab_bar::set_cursor (WPARAM wparam, LPARAM lparam)
 int
 tab_bar::lbtn_down (int x, int y)
 {
-  if (!app.kbdq.idlep () || !t_horz_text || !dock_vert_p ())
+  if (!b_app_frame->kbdq.idlep () || !t_horz_text || !dock_vert_p ())
     return 0;
 
   RECT cr;
@@ -1357,7 +1357,7 @@ done:
 int
 tab_bar::move_tab (int x, int y)
 {
-  if (!app.kbdq.idlep () || GetKeyState (VK_LBUTTON) >= 0)
+  if (!b_app_frame->kbdq.idlep () || GetKeyState (VK_LBUTTON) >= 0)
     return 0;
   POINT pt;
   GetCursorPos (&pt);
@@ -1373,7 +1373,7 @@ tab_bar::move_tab (int x, int y)
 
   HCURSOR hcur_old = GetCursor ();
   HCURSOR hcur_no = LoadCursor (0, IDC_NO);
-  HCURSOR hcur_mv = LoadCursor (app.hinst,
+  HCURSOR hcur_mv = LoadCursor (b_app_frame->hinst,
                                 MAKEINTRESOURCE (dock_vert_p ()
                                                  ? IDC_MOVEUD : IDC_MOVELR));
 
@@ -2494,14 +2494,15 @@ tool_bm::load (const char *path, int &e)
 {
   e = LMB_NO_ERRORS;
 
-  for (bm_node *p = bm_list.head (); p; p = p->next ())
+  bm_node *p;
+  for (p = bm_list.head (); p; p = p->next ())
     if (strcaseeq (path, p->b_path))
       {
         p->incref ();
         return p;
       }
 
-  bm_node *p = new bm_node;
+  p = new bm_node;
   p->b_path = strdup (path);
   if (p->b_path)
     {

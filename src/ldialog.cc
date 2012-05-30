@@ -956,8 +956,8 @@ item_string (lisp item, char *buf, int size)
           else if (c == '\t')
             {
               int col = b - b0;
-              int goal = ((col + app.default_tab_columns) / app.default_tab_columns
-                          * app.default_tab_columns);
+              int goal = ((col + g_app.default_tab_columns) / g_app.default_tab_columns
+                          * g_app.default_tab_columns);
               for (int n = min (goal - col, be - b); n > 0; n--)
                 *b++ = ' ';
             }
@@ -1273,7 +1273,7 @@ ldialog_proc (HWND dlg, UINT msg, WPARAM wparam, LPARAM lparam)
       return 1;
 
     case WM_ACTIVATEAPP:
-      PostThreadMessage (app.quit_thread_id, WM_PRIVATE_ACTIVATEAPP,
+      PostThreadMessage (g_app.quit_thread_id, WM_PRIVATE_ACTIVATEAPP,
                          wparam, lparam);
       return 0;
 
@@ -1310,14 +1310,14 @@ PropSheetFont::find_font (const DLGTEMPLATE *tmpl)
   if (!(tmpl->style & DS_SETFONT))
     return;
   const WORD *w = (const WORD *)(tmpl + 1);
-  w += *w == 0xffff ? 2 : 1 + wcslen (w);
-  w += *w == 0xffff ? 2 : 1 + wcslen (w);
-  w += 1 + wcslen (w);
+  w += *w == 0xffff ? 2 : 1 + wcslen ((const wchar_t *)w);
+  w += *w == 0xffff ? 2 : 1 + wcslen ((const wchar_t *)w);
+  w += 1 + wcslen ((const wchar_t *)w);
   point = short (*w++);
-  int l = wcslen (w);
+  int l = wcslen ((const wchar_t *)w);
   if (l < LF_FACESIZE)
     {
-      wcscpy (face, w);
+      wcscpy (face, (const wchar_t *)w);
       face_len = l;
     }
 }
@@ -1362,13 +1362,13 @@ PropSheetFont::change_font (const DLGTEMPLATE *rtmpl, DWORD size)
   WORD *w = (WORD *)(tmpl + 1);
   const WORD *r0 = (const WORD *)(rtmpl + 1);
   const WORD *r = r0;
-  r += *r == 0xffff ? 2 : 1 + wcslen (r);
-  r += *r == 0xffff ? 2 : 1 + wcslen (r);
-  r += 1 + wcslen (r);
+  r += *r == 0xffff ? 2 : 1 + wcslen ((const wchar_t *)r);
+  r += *r == 0xffff ? 2 : 1 + wcslen ((const wchar_t *)r);
+  r += 1 + wcslen ((const wchar_t *)r);
   memcpy (w, r0, sizeof (WORD) * (r - r0));
   w += r - r0;
   if (rtmpl->style & DS_SETFONT)
-    r += 2 + wcslen (r + 1);
+    r += 2 + wcslen ((const wchar_t *)r + 1);
   *w++ = PropSheetFont::point;
   memcpy (w, PropSheetFont::face, sizeof (WCHAR) * (PropSheetFont::face_len + 1));
   w += PropSheetFont::face_len + 1;
@@ -1384,11 +1384,11 @@ PropSheetFont::change_font (const char *id)
     return 0;
 
   HGLOBAL result = 0;
-  HRSRC hrsrc = FindResource (app.hinst, id, RT_DIALOG);
-  const DLGTEMPLATE *tmpl = (DLGTEMPLATE *)LoadResource (app.hinst, hrsrc);
+  HRSRC hrsrc = FindResource (active_app_frame().hinst, id, RT_DIALOG);
+  const DLGTEMPLATE *tmpl = (DLGTEMPLATE *)LoadResource (active_app_frame().hinst, hrsrc);
   if (tmpl)
     {
-      DWORD size = SizeofResource (app.hinst, hrsrc);
+      DWORD size = SizeofResource (active_app_frame().hinst, hrsrc);
       result = change_font (tmpl, size);
     }
   return result;
@@ -1405,7 +1405,8 @@ Dialog::create_dialog_template (lisp dialog, lisp handlers,
   if (xcar (d) != Qdialog)
     FEtype_error (xcar (d), Qdialog);
   d = xcdr (d);
-  for (int i = 0; i < 4; i++, d = xcdr (d))
+  int i;
+  for (i = 0; i < 4; i++, d = xcdr (d))
     fixnum_value (xcar (d));
 
   int size = (sizeof (DLGTEMPLATE)
@@ -1702,7 +1703,7 @@ Fdialog_box (lisp dialog, lisp init, lisp handlers)
                              | WS_CAPTION | WS_SYSMENU),
                             0);
 
-  int result = DialogBoxIndirectParam (app.hinst,
+  int result = DialogBoxIndirectParam (active_app_frame().hinst,
                                        d.get_template (),
                                        get_active_window (), ldialog_proc,
                                        LPARAM (&d));
@@ -1795,7 +1796,7 @@ lprop_page_proc (HWND dlg, UINT msg, WPARAM wparam, LPARAM lparam)
 
 #if 0
     case WM_ACTIVATEAPP:
-      PostThreadMessage (app.quit_thread_id, WM_PRIVATE_ACTIVATEAPP,
+      PostThreadMessage (g_app.quit_thread_id, WM_PRIVATE_ACTIVATEAPP,
                          wparam, lparam);
       return 0;
 #endif
@@ -1828,7 +1829,7 @@ PropPage::init_page (PropSheet *parent, int page_no, PROPSHEETPAGE *psp, lisp in
   p_page_no = page_no;
   psp->dwSize = sizeof *psp;
   psp->dwFlags = PSP_DLGINDIRECT;
-  psp->hInstance = app.hinst;
+  psp->hInstance = active_app_frame().hinst;
   psp->pResource = get_template (),
   psp->pszIcon = 0;
   psp->pfnDlgProc = lprop_page_proc;
@@ -1906,7 +1907,8 @@ Fproperty_sheet (lisp pages, lisp caption, lisp lstart_page)
   protect_gc gcpro (pages);
 
   int total_pages = 0, lpages = 0;
-  for (lisp p = pages; consp (p); p = xcdr (p), total_pages++)
+  lisp p;
+  for (p = pages; consp (p); p = xcdr (p), total_pages++)
     {
       QUIT;
       lisp x = xcar (p);
@@ -1966,7 +1968,7 @@ Fproperty_sheet (lisp pages, lisp caption, lisp lstart_page)
   psh.dwSize = sizeof psh;
   psh.dwFlags = PSH_PROPSHEETPAGE | PSH_USECALLBACK | PSH_NOAPPLYNOW;
   psh.hwndParent = get_active_window ();
-  psh.hInstance = app.hinst;
+  psh.hInstance = active_app_frame().hinst;
   psh.pszIcon = 0;
   psh.pszCaption = b;
   psh.nPages = total_pages;

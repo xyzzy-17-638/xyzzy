@@ -1055,6 +1055,9 @@ static symbols sys[] =
 
   SI_DEFUN3 (inflate-stream, 1, 1, 0),
   //SI_DEFUN3 (deflate-stream, 1, 2, 0),
+
+  /* vfs.cc */
+  SI_DEFUN3 (wow64-reinterpret-path, 2, 0, 0),
 };
 
 static symbols kwd[] =
@@ -1136,6 +1139,7 @@ static symbols kwd[] =
   DEFKWD2 (windows-vista),
   DEFKWD2 (windows-7),
   DEFKWD2 (windows-8),
+  DEFKWD2 (multiple-frames),
   DEFKWD2 (x86),
   DEFKWD2 (x64),
   DEFKWD2 (ia64),
@@ -1719,7 +1723,7 @@ static symbols ed[] =
   DEFUN3 (buffer-size, 0, 1, 0),
   DEFUN3 (buffer-lines, 0, 1, 0),
   DEFUN3 (create-new-buffer, 1, 0, 0),
-  DEFUN3 (selected-buffer, 0, 0, 0),
+  DEFUN3 (selected-buffer, 0, 1, 0),
   DEFUN3 (deleted-buffer-p, 1, 0, 0),
   DEFUN3 (get-next-buffer, 0, 4, 0),
   DEFUN3 (set-buffer, 1, 0, 0),
@@ -1754,6 +1758,8 @@ static symbols ed[] =
   DEFUN3 (count-modified-buffers, 0, 0, 0),
   DEFUN3 (count-buffers, 0, 1, 0),
   DEFCMD3 (kill-xyzzy, 0, 1, 0, ""),
+  DEFUN3 (prepare-for-kill-xyzzy, 0, 0, 0),
+  DEFCMD3 (restart-for-update, 0, 0, 0, ""),
   DEFUN3 (lock-file, 0, 1, 0),
   DEFUN3 (unlock-file, 0, 1, 0),
   DEFUN3 (file-locked-p, 0, 1, 0),
@@ -1788,7 +1794,7 @@ static symbols ed[] =
   DEFUN3 (set-hjump-columns, 1, 1, 0),
   DEFUN3 (hjump-columns, 0, 1, 0),
   DEFUN3 (refresh-title-bar, 0, 0, 0),
-  DEFUN3 (create-buffer-bar, 0, 0, 0),
+  DEFUN3 (create-buffer-bar, 0, 1, 0),
   MAKE_SYMBOL2 (buffer-bar),
   DEFVAR2 (*buffer-bar-selected-buffer-to-first*),
   DEFVAR2 (*buffer-bar-hook*),
@@ -1800,6 +1806,23 @@ static symbols ed[] =
   MAKE_SYMBOL2 (post-buffer-modified-hook),
   DEFUN3 (enable-post-buffer-modified-hook, 1, 1, 0),
   DEFUN3 (post-buffer-modified-hook-enabled-p, 0, 1, 0),
+
+  /* frame.cc */
+  MAKE_SYMBOL2 (startup-frame),
+  MAKE_SYMBOL2 (startup-frame-second),
+  DEFCMD3 (make-frame, 0, 1, 0, ""),
+  DEFUN3 (selected-frame, 0, 0, 0),
+  DEFUN3 (next-frame, 1, 1, 0),
+  DEFUN3 (frame-list, 0, 0, 0),
+  DEFCMD3 (other-frame, 0, 0, 0, ""),
+  DEFCMD3 (delete-frame, 0, 2, 0, ""),
+  DEFCMD3 (select-frame, 0, 1, 0, ""),
+  DEFCMD3 (get-frame-window-handle, 0, 1, 0, ""),
+  DEFCMD3 (get-frame-index, 0, 1, 0, ""),
+  MAKE_SYMBOL2 (*before-make-frame-hook*),
+  MAKE_SYMBOL2 (*delete-frame-functions*),
+  MAKE_SYMBOL2 (*frame-init-width*),
+  MAKE_SYMBOL2 (*frame-init-height*),
 
   /* insdel.cc */
   DEFUN3 (insert-file-contents, 1, 3, 0),
@@ -1852,6 +1875,7 @@ static symbols ed[] =
   DEFUN3 (wait-object-p, 1, 0, 0),
   DEFUN3 (char-encoding-p, 1, 0, 0),
   MAKE_SYMBOL2Q (window),
+  MAKE_SYMBOL2Q (appframe),
   MAKE_SYMBOL2Q (buffer),
   MAKE_SYMBOL2Q (marker),
   MAKE_SYMBOL2Q (regexp),
@@ -2033,11 +2057,11 @@ static symbols ed[] =
 
   /* Window.cc */
   DEFCMD3 (split-window, 0, 2, 0, "p"),
-  DEFCMD3 (delete-other-windows, 0, 0, 0, ""),
+  DEFCMD3 (delete-other-windows, 0, 1, 0, ""),
   DEFCMD3 (delete-window, 0, 0, 0, ""),
-  DEFUN3 (deleted-window-p, 1, 0, 0),
-  DEFUN3 (selected-window, 0, 0, 0),
-  DEFUN3 (minibuffer-window, 0, 0, 0),
+ DEFUN3 (deleted-window-p, 1, 0, 0),
+  DEFUN3 (selected-window, 0, 1, 0),
+  DEFUN3 (minibuffer-window, 0, 1, 0),
   DEFUN3 (minibuffer-window-p, 1, 0, 0),
   DEFUN3 (window-buffer, 1, 0, 0),
   DEFUN3 (next-window, 1, 1, 0),
@@ -2065,8 +2089,8 @@ static symbols ed[] =
   DEFUN3 (list-xyzzy-windows, 0, 0, 0),
   DEFUN3 (activate-xyzzy-window, 1, 0, 0),
   DEFUN3 (count-xyzzy-instance, 0, 0, 0),
-  DEFUN3 (current-window-configuration, 0, 0, 0),
-  DEFUN3 (set-window-configuration, 1, 0, 0),
+  DEFUN3 (current-window-configuration, 0, 1, 0),
+  DEFUN3 (set-window-configuration, 1, 1, 0),
   DEFUN3 (window-coordinate, 0, 1, 0),
   MAKE_SYMBOL2Q (window-configuration),
   MAKE_SYMBOL2 (mouse-wheel-handler),
@@ -2379,7 +2403,7 @@ static symbols ed[] =
   DEFUN3 (insert-popup-menu, 4, 0, 0),
   DEFUN3 (insert-menu-item, 4, 2, 0),
   DEFUN3 (insert-menu-separator, 2, 1, 0),
-  DEFUN3 (set-menu, 1, 0, 0),
+  DEFUN3 (set-menu, 1, 1, 0),
   DEFUN3 (delete-menu, 2, 1, 0),
   DEFUN3 (track-popup-menu, 1, 1, 0),
   DEFUN3 (use-local-menu, 1, 0, 0),
@@ -2402,7 +2426,7 @@ static symbols ed[] =
   DEFUN3 (pop-ime-composition-string, 0, 0, 0),
   DEFUN3 (set-ime-read-string, 0, 1, 0),
   DEFUN3 (*ime-register-word-dialog, 0, 2, 0),
-  DEFUN3 (enable-global-ime, 1, 0, 0),
+  DEFUN3 (enable-global-ime, 1, 1, 0),
   DEFVAR2 (*ime-control*),
   DEFVAR2 (*extended-key-translate-table*),
   DEFVAR2 (*kbd-translate-table*),
@@ -2640,26 +2664,26 @@ static symbols ed[] =
   MAKE_SYMBOL2 (*status-bar-format*),
 
   /* usertool.cc */
-  DEFUN3 (create-tool-bar, 3, 0, 0),
-  DEFUN3 (show-tool-bar, 1, 4, 0),
-  DEFUN3 (hide-tool-bar, 1, 0, 0),
-  DEFUN3 (delete-tool-bar, 1, 0, 0),
-  DEFUN3 (tool-bar-exist-p, 1, 0, 0),
-  DEFUN3 (tool-bar-info, 1, 0, 0),
-  DEFUN3 (list-tool-bars, 0, 0, 0),
-  DEFCMD3 (focus-tool-bar, 0, 0, 0, ""),
-  DEFUN3 (refresh-tool-bars, 0, 0, 0),
+  DEFUN3 (create-tool-bar, 3, 1, 0),
+  DEFUN3 (show-tool-bar, 1, 5, 0),
+  DEFUN3 (hide-tool-bar, 1, 1, 0),
+  DEFUN3 (delete-tool-bar, 1, 1, 0),
+  DEFUN3 (tool-bar-exist-p, 1, 1, 0),
+  DEFUN3 (tool-bar-info, 1, 1, 0),
+  DEFUN3 (list-tool-bars, 0, 1, 0),
+  DEFCMD3 (focus-tool-bar, 0, 1, 0, ""),
+  DEFUN3 (refresh-tool-bars, 0, 1, 0),
   DEFVAR2 (*tab-bar-horizontal-text*),
 
   /* usertab.cc */
-  DEFUN3 (create-tab-bar, 2, 0, 0),
-  DEFUN3 (tab-bar-add-item, 3, 2, FFneed_rest),
-  DEFUN3 (tab-bar-delete-item, 2, 0, 0),
-  DEFUN3 (tab-bar-select-item, 2, 0, 0),
-  DEFUN3 (tab-bar-current-item, 1, 0, 0),
-  DEFUN3 (tab-bar-find-item, 2, 0, 0),
-  DEFUN3 (tab-bar-list-items, 1, 0, 0),
-  DEFUN3 (tab-bar-modify-item, 2, 3, 0),
+  DEFUN3 (create-tab-bar, 2, 1, 0),
+  DEFUN3 (tab-bar-add-item, 3, 3, FFneed_rest),
+  DEFUN3 (tab-bar-delete-item, 2, 1, 0),
+  DEFUN3 (tab-bar-select-item, 2, 1, 0),
+  DEFUN3 (tab-bar-current-item, 1, 1, 0),
+  DEFUN3 (tab-bar-find-item, 2, 1, 0),
+  DEFUN3 (tab-bar-list-items, 1, 1, 0),
+  DEFUN3 (tab-bar-modify-item, 2, 4, 0),
   DEFVAR2 (*tab-bar-never-focus*),
 
   /* utimer.cc */
@@ -2682,6 +2706,8 @@ static symbols ed[] =
   DEFVAR2 (*restore-window-size*),
   DEFVAR2 (*restore-window-position*),
   DEFVAR2 (*buffer-list-sort-ignore-case*),
+  DEFVAR2 (*wow64-enable-file-system-redirector*),
+  DEFVAR2 (*parent-process-wow64-p*),
 };
 
 static void
@@ -2909,6 +2935,9 @@ static void
 print_string ()
 {
   soffset = 0;
+  printf ("#define EXTERN /* empty */\n");
+  printf ("#include \"ed.h\"\n");
+  printf ("#include \"symtable.h\"\n\n");
   printf ("static const char SS[] = \n\"");
   do_all (print_string);
   printf ("\";\n\n");
@@ -2939,8 +2968,8 @@ static void
 process_interactive ()
 {
   const char **intr = (const char **)alloca (sizeof (char *) * numberof (ed));
-  int j = 0;
-  for (int i = 0; i < numberof (ed); i++)
+  int i, j;
+  for (i = 0, j = 0; i < numberof (ed); i++)
     if (ed[i].interactive)
       intr[j++] = ed[i].interactive;
   if (!j)
@@ -2951,13 +2980,12 @@ process_interactive ()
   int n = j;
   qsort (intr, n, sizeof *intr, compare);
 
-  j = 1;
-  for (int i = 1; i < n; i++)
+  for (i = 1, j = 1; i < n; i++)
     if (strcmp (intr[i], intr[j - 1]))
       intr[j++] = intr[i];
   n = j;
 
-  for (int i = 0; i < numberof (ed); i++)
+  for (i = 0; i < numberof (ed); i++)
     if (ed[i].interactive)
       {
         for (j = 0; j < n; j++)
@@ -2974,7 +3002,7 @@ process_interactive ()
       }
 
   printf ("lintr intrs[] =\n{\n");
-  for (int i = 0; i < n; i++)
+  for (i = 0; i < n; i++)
     {
       printf ("  {");
       putq (intr[i]);

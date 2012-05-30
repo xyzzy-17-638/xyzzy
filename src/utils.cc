@@ -492,7 +492,7 @@ frameDC::frameDC (HWND hwnd, int flags)
   f_hdc = GetDCEx (f_hwnd, 0,
                    flags | DCX_CACHE | (LockWindowUpdate (f_hwnd)
                                         ? DCX_LOCKWINDOWUPDATE : 0));
-  HBITMAP hbm = LoadBitmap (app.hinst, MAKEINTRESOURCE (IDB_CHECK));
+  HBITMAP hbm = LoadBitmap (active_app_frame().hinst, MAKEINTRESOURCE (IDB_CHECK));
   f_obr = SelectObject (f_hdc, CreatePatternBrush (hbm));
   DeleteObject (hbm);
 }

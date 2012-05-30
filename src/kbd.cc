@@ -105,10 +105,19 @@ kbd_queue::puts (const char *string, int l)
   return 1;
 }
 
+#include <exception>
+
+bool kbd_queue::change_application_window = false;
+
 lChar
 kbd_queue::peek (int req_mouse_move)
 {
   lChar c;
+  if (kbd_queue::change_application_window)
+  {
+	  kbd_queue::change_application_window = false;
+	  throw std::exception();
+  }
   if (pending != lChar_EOF)
     {
       c = pending;
@@ -195,8 +204,8 @@ kbd_queue::sleep_timer::sleep_timer (kbd_queue &q)
 
 kbd_queue::sleep_timer::~sleep_timer ()
 {
-  KillTimer (app.toplev, TID_SLEEP);
-  app.sleep_timer_exhausted = 0;
+  KillTimer (active_app_frame().toplev, TID_SLEEP);
+  active_app_frame().sleep_timer_exhausted = 0;
   s_kbdq.st_start_time = s_save_start_time;
   s_kbdq.st_timeout = s_save_timeout;
   if (s_kbdq.st_timeout >= 0)
@@ -204,9 +213,9 @@ kbd_queue::sleep_timer::~sleep_timer ()
       DWORD req = s_kbdq.st_start_time + s_kbdq.st_timeout;
       DWORD curtime = GetTickCount ();
       if (req >= curtime)
-        app.sleep_timer_exhausted = 1;
+        active_app_frame().sleep_timer_exhausted = 1;
       else
-        SetTimer (app.toplev, TID_SLEEP, req - curtime, 0);
+        SetTimer (active_app_frame().toplev, TID_SLEEP, req - curtime, 0);
     }
 }
 
@@ -216,9 +225,9 @@ kbd_queue::sleep_timer::wait (int timeout, int kbdp)
   disable_kbd dkbd (s_kbdq);
   s_kbdq.st_start_time = GetTickCount ();
   s_kbdq.st_timeout = timeout;
-  app.sleep_timer_exhausted = 0;
-  SetTimer (app.toplev, TID_SLEEP, timeout, 0);
-  while ((!kbdp || s_kbdq.head == s_kbdq.tail) && !app.sleep_timer_exhausted)
+  active_app_frame().sleep_timer_exhausted = 0;
+  SetTimer (active_app_frame().toplev, TID_SLEEP, timeout, 0);
+  while ((!kbdp || s_kbdq.head == s_kbdq.tail) && !active_app_frame().sleep_timer_exhausted)
     {
       QUIT;
       MSG msg;
@@ -329,7 +338,7 @@ kbd_queue::track_popup_menu (HMENU hmenu, int button, const POINT &p)
   if (idlep ())
     {
       result = TrackPopupMenu (hmenu, TPM_RETURNCMD | TPM_LEFTALIGN | button,
-                               p.x, p.y, 0, app.toplev, 0);
+                               p.x, p.y, 0, active_app_frame().toplev, 0);
       if (result == -1)
         result = 0;
     }
@@ -347,13 +356,13 @@ kbd_queue::close_ime ()
         last_ime_status = -1;
       else if (last_ime_status == -1)
         {
-          HIMC imc = gime.ImmGetContext (app.toplev);
+          HIMC imc = gime.ImmGetContext (active_app_frame().toplev);
           if (imc)
             {
               last_ime_status = gime.ImmGetOpenStatus (imc);
               if (last_ime_status)
                 gime.ImmSetOpenStatus (imc, 0);
-              gime.ImmReleaseContext (app.toplev, imc);
+              gime.ImmReleaseContext (active_app_frame().toplev, imc);
             }
         }
     }
@@ -367,11 +376,11 @@ kbd_queue::restore_ime ()
       && xsymbol_value (Vime_control) != Qnil
       && last_ime_status != -1)
     {
-      HIMC imc = gime.ImmGetContext (app.toplev);
+      HIMC imc = gime.ImmGetContext (active_app_frame().toplev);
       if (imc)
         {
           gime.ImmSetOpenStatus (imc, last_ime_status);
-          gime.ImmReleaseContext (app.toplev, imc);
+          gime.ImmReleaseContext (active_app_frame().toplev, imc);
           last_ime_status = -1;
         }
     }
@@ -380,13 +389,13 @@ kbd_queue::restore_ime ()
 int
 kbd_queue::toggle_ime (int new_stat, int update_last_ime_status)
 {
-  HIMC imc = gime.ImmGetContext (app.toplev);
+  HIMC imc = gime.ImmGetContext (active_app_frame().toplev);
   if (!imc)
     return 0;
   int old_stat = gime.ImmGetOpenStatus (imc) ? IME_MODE_ON : IME_MODE_OFF;
   if (new_stat == IME_MODE_TOGGLE || new_stat != old_stat)
     gime.ImmSetOpenStatus (imc, old_stat != IME_MODE_ON);
-  gime.ImmReleaseContext (app.toplev, imc);
+  gime.ImmReleaseContext (active_app_frame().toplev, imc);
   if (update_last_ime_status)
     last_ime_status = -1;
   return old_stat;
@@ -442,7 +451,7 @@ kbd_queue::lookup_kbd_macro (lisp string) const
 void
 check_kbd_enable ()
 {
-  if (IsWindowEnabled (app.toplev))
+  if (IsWindowEnabled (active_app_frame().toplev))
     return;
   FEprogram_error (Ekbd_input_is_disabled);
 }
@@ -529,7 +538,7 @@ translate_unicode (HWND hwnd, WPARAM wparam, LPARAM lparam)
 BOOL
 XyzzyTranslateMessage (const MSG *msg)
 {
-  if (msg->hwnd == app.toplev || Filer::filer_ancestor_p (msg->hwnd))
+  if (msg->hwnd == active_app_frame().toplev || Filer::filer_ancestor_p (msg->hwnd))
     {
       switch (msg->message)
         {
@@ -545,7 +554,7 @@ XyzzyTranslateMessage (const MSG *msg)
           if (msg->wParam == VK_PROCESSKEY
               && xsymbol_value (Vime_does_not_process_control_backslach) != Qnil)
             {
-              int key = to_ascii_char (app.kbdq.gime.ImmGetVirtualKey (msg->hwnd), msg->lParam);
+              int key = to_ascii_char (active_app_frame().kbdq.gime.ImmGetVirtualKey (msg->hwnd), msg->lParam);
               if (key == '\\' || key == '_')
                 {
                   PostMessage (msg->hwnd, msg->message == WM_KEYDOWN ? WM_CHAR : WM_SYSCHAR,
@@ -555,7 +564,7 @@ XyzzyTranslateMessage (const MSG *msg)
             }
           else
             {
-              if (app.kbdq.unicode_kbd_p () && msg->message == WM_KEYDOWN
+              if (active_app_frame().kbdq.unicode_kbd_p () && msg->message == WM_KEYDOWN
                   && exkey_index (msg->wParam, 0) < 0
                   && translate_unicode (msg->hwnd, msg->wParam, msg->lParam))
                 return 1;
@@ -579,7 +588,7 @@ XyzzyTranslateMessage (const MSG *msg)
           break;
         }
     }
-  return app.kbdq.gime.TranslateMessage (msg);
+  return active_app_frame().kbdq.gime.TranslateMessage (msg);
 }
 
 static lChar
@@ -983,7 +992,7 @@ void
 kbd_queue::init_kbd_encoding (LANGID langid)
 {
   set_kbd_langid (langid);
-  ime_prop = app.kbdq.gime.ImmGetProperty (get_kbd_layout (), IGP_PROPERTY);
+  ime_prop = active_app_frame().kbdq.gime.ImmGetProperty (get_kbd_layout (), IGP_PROPERTY);
 
   unicode_kbd = 0;
   for (lisp p = xsymbol_value (Vkeyboard_layout_list); consp (p); p = xcdr (p))
@@ -1027,31 +1036,31 @@ kbd_queue::kbd_encoding_font ()
   switch (xchar_encoding_type (encoding))
     {
     case encoding_sjis:
-      return app.text_font.font (FONT_JP);
+      return active_app_frame().text_font.font (FONT_JP);
 
     case encoding_big5:
-      return app.text_font.font (FONT_CN_TRADITIONAL);
+      return active_app_frame().text_font.font (FONT_CN_TRADITIONAL);
 
     case encoding_windows_codepage:
       switch (xchar_encoding_windows_codepage (encoding))
         {
         case CP_JAPANESE:
-          return app.text_font.font (FONT_JP);
+          return active_app_frame().text_font.font (FONT_JP);
 
         case CP_KOREAN:
-          return app.text_font.font (FONT_HANGUL);
+          return active_app_frame().text_font.font (FONT_HANGUL);
 
         case CP_CN_TRADITIONAL:
-          return app.text_font.font (FONT_CN_TRADITIONAL);
+          return active_app_frame().text_font.font (FONT_CN_TRADITIONAL);
 
         case CP_CN_SIMPLIFIED:
-          return app.text_font.font (FONT_CN_SIMPLIFIED);
+          return active_app_frame().text_font.font (FONT_CN_SIMPLIFIED);
 
         case CP_CYRILLIC:
-          return app.text_font.font (FONT_CYRILLIC);
+          return active_app_frame().text_font.font (FONT_CYRILLIC);
 
         case CP_GREEK:
-          return app.text_font.font (FONT_GREEK);
+          return active_app_frame().text_font.font (FONT_GREEK);
         }
       break;
 
@@ -1060,20 +1069,20 @@ kbd_queue::kbd_encoding_font ()
         {
         case ENCODING_LANG_JP:
         case ENCODING_LANG_JP2:
-          return app.text_font.font (FONT_JP);
+          return active_app_frame().text_font.font (FONT_JP);
 
         case ENCODING_LANG_KR:
-          return app.text_font.font (FONT_HANGUL);
+          return active_app_frame().text_font.font (FONT_HANGUL);
 
         case ENCODING_LANG_CN_GB:
-          return app.text_font.font (FONT_CN_SIMPLIFIED);
+          return active_app_frame().text_font.font (FONT_CN_SIMPLIFIED);
 
         case ENCODING_LANG_CN_BIG5:
         case ENCODING_LANG_CN:
-          return app.text_font.font (FONT_CN_TRADITIONAL);
+          return active_app_frame().text_font.font (FONT_CN_TRADITIONAL);
         }
     }
-  return app.text_font.font (FONT_LATIN);
+  return active_app_frame().text_font.font (FONT_LATIN);
 }
 
 
@@ -1108,7 +1117,7 @@ key_sequence::notice (int n, int cont)
       *b++ = ' ';
     }
   *b = 0;
-  app.status_window.puts (buf, 1);
+  active_app_frame().status_window.puts (buf, 1);
 }
 
 void
@@ -1229,11 +1238,11 @@ ime_comp_queue::pop ()
 lisp
 Fsit_for (lisp timeout, lisp nodisp)
 {
-  if (!app.kbdq.macro_is_running ())
+  if (!active_app_frame().kbdq.macro_is_running ())
     {
       if (!nodisp || nodisp == Qnil)
         refresh_screen (0);
-      app.kbdq.sit_for (DWORD (coerce_to_double_float (timeout) * 1000));
+      active_app_frame().kbdq.sit_for (DWORD (coerce_to_double_float (timeout) * 1000));
     }
   return Qnil;
 }
@@ -1241,14 +1250,14 @@ Fsit_for (lisp timeout, lisp nodisp)
 lisp
 Fsleep_for (lisp timeout)
 {
-  app.kbdq.sleep_for (DWORD (coerce_to_double_float (timeout) * 1000));
+  active_app_frame().kbdq.sleep_for (DWORD (coerce_to_double_float (timeout) * 1000));
   return Qnil;
 }
 
 lisp
 Fdo_events ()
 {
-  app.kbdq.process_events ();
+  active_app_frame().kbdq.process_events ();
   return Qnil;
 }
 
@@ -1257,9 +1266,9 @@ Freset_prefix_args (lisp arg, lisp value)
 {
   xsymbol_value (Vnext_prefix_args) = arg;
   xsymbol_value (Vnext_prefix_value) = value;
-  app.keyseq.again (!app.kbdq.macro_is_running ());
-  app.kbdq.close_ime ();
-  app.kbdq.keep_next_command_key ();
+  active_app_frame().keyseq.again (!active_app_frame().kbdq.macro_is_running ());
+  active_app_frame().kbdq.close_ime ();
+  active_app_frame().kbdq.keep_next_command_key ();
   Fcontinue_pre_selection ();
   return Qt;
 }
@@ -1272,10 +1281,10 @@ Fset_next_prefix_args (lisp arg, lisp value, lisp c)
   if (c && c != Qnil)
     {
       check_char (c);
-      app.keyseq.push (xchar_code (c), !app.kbdq.macro_is_running ());
+      active_app_frame().keyseq.push (xchar_code (c), !active_app_frame().kbdq.macro_is_running ());
       Fcontinue_pre_selection ();
-      app.kbdq.close_ime ();
-      app.kbdq.keep_next_command_key ();
+      active_app_frame().kbdq.close_ime ();
+      active_app_frame().kbdq.keep_next_command_key ();
     }
   return Qt;
 }
@@ -1283,30 +1292,30 @@ Fset_next_prefix_args (lisp arg, lisp value, lisp c)
 lisp
 Fstart_save_kbd_macro ()
 {
-  if (app.kbdq.save_p ())
+  if (active_app_frame().kbdq.save_p ())
     return Qnil;
-  app.kbdq.start_macro ();
+  active_app_frame().kbdq.start_macro ();
   return Qt;
 }
 
 lisp
 Fstop_save_kbd_macro ()
 {
-  if (!app.kbdq.save_p ())
+  if (!active_app_frame().kbdq.save_p ())
     return Qnil;
-  return app.kbdq.end_macro ();
+  return active_app_frame().kbdq.end_macro ();
 }
 
 lisp
 Fkbd_macro_saving_p ()
 {
-  return boole (app.kbdq.save_p ());
+  return boole (active_app_frame().kbdq.save_p ());
 }
 
 lisp
 Ftoggle_ime (lisp arg)
 {
-  return boole (app.kbdq.toggle_ime (arg
+  return boole (active_app_frame().kbdq.toggle_ime (arg
                                      ? (arg == Qnil
                                         ? kbd_queue::IME_MODE_OFF
                                         : kbd_queue::IME_MODE_ON)
@@ -1317,20 +1326,20 @@ lisp
 Fget_recent_keys ()
 {
   Char b[128];
-  int n = app.kbdq.copy_queue (b, numberof (b));
+  int n = active_app_frame().kbdq.copy_queue (b, numberof (b));
   return make_string (b, n);
 }
 
 lisp
 Fget_ime_mode ()
 {
-  return boole (app.ime_open_mode == kbd_queue::IME_MODE_ON);
+  return boole (active_app_frame().ime_open_mode == kbd_queue::IME_MODE_ON);
 }
 
 lisp
 Fget_ime_composition_string ()
 {
-  const ime_comp_queue::pair *p = app.ime_compq.fetch ();
+  const ime_comp_queue::pair *p = active_app_frame().ime_compq.fetch ();
   if (!p)
     return Qnil;
   return xcons (make_string (p->comp, p->compl),
@@ -1340,7 +1349,7 @@ Fget_ime_composition_string ()
 lisp
 Fpop_ime_composition_string ()
 {
-  const ime_comp_queue::pair *p = app.ime_compq.pop ();
+  const ime_comp_queue::pair *p = active_app_frame().ime_compq.pop ();
   if (!p)
     return Qnil;
   return xcons (make_string (p->comp, p->compl),
@@ -1353,7 +1362,7 @@ Fset_ime_read_string (lisp string)
   char *read;
   if (!string || string == Qnil)
     {
-      const ime_comp_queue::pair *p = app.ime_compq.fetch ();
+      const ime_comp_queue::pair *p = active_app_frame().ime_compq.fetch ();
       if (!p)
         return Qnil;
       read = (char *)alloca (w2sl (p->read, p->readl) + 1);
@@ -1365,12 +1374,12 @@ Fset_ime_read_string (lisp string)
       read = (char *)alloca (w2sl (string) + 1);
       w2s (read, string);
     }
-  HIMC hIMC = app.kbdq.gime.ImmGetContext (app.toplev);
+  HIMC hIMC = active_app_frame().kbdq.gime.ImmGetContext (active_app_frame().toplev);
   if (!hIMC)
     return Qnil;
-  int f = app.kbdq.gime.ImmSetCompositionString (hIMC, SCS_SETSTR, 0, 0,
+  int f = active_app_frame().kbdq.gime.ImmSetCompositionString (hIMC, SCS_SETSTR, 0, 0,
                                                  read, strlen (read));
-  app.kbdq.gime.ImmReleaseContext (app.toplev, hIMC);
+  active_app_frame().kbdq.gime.ImmReleaseContext (active_app_frame().toplev, hIMC);
   return boole (f);
 }
 
@@ -1396,16 +1405,17 @@ Fime_register_word_dialog (lisp lcomp, lisp lread)
           *e = 0;
         }
     }
-  return boole (app.kbdq.gime.ImmConfigureIME (GetKeyboardLayout (0), app.toplev,
+  return boole (active_app_frame().kbdq.gime.ImmConfigureIME (GetKeyboardLayout (0), active_app_frame().toplev,
                                                IME_CONFIG_REGISTERWORD, &rw));
 }
 
 lisp
-Fenable_global_ime (lisp f)
+Fenable_global_ime (lisp f, lisp lframe)
 {
+  ApplicationFrame *app = ApplicationFrame::coerce_to_frame(lframe);
   if (f == Qnil)
-    app.kbdq.gime.disable ();
-  else if (!app.kbdq.gime.enable (&app.atom_toplev, 1))
+    app->kbdq.gime.disable ();
+  else if (!app->kbdq.gime.enable (&app->atom_toplev, 1))
     FEsimple_win32_error (GetLastError ());
   return Qt;
 }
@@ -1417,7 +1427,7 @@ get_kbd_layout_name (HKL hkl, char *buf, int size)
   sprintf (k, "SYSTEM\\CurrentControlSet\\Control\\Keyboard Layouts\\%08x", hkl);
   ReadRegistry r (HKEY_LOCAL_MACHINE, k);
   return ((!r.fail () && r.get ("Layout Text", buf, size) > 0)
-          || app.kbdq.gime.ImmGetDescription (hkl, buf, size) > 0);
+          || active_app_frame().kbdq.gime.ImmGetDescription (hkl, buf, size) > 0);
 }
 
 typedef UINT (WINAPI *GETKEYBOARDLAYOUTLIST)(int, HKL *);
@@ -1504,7 +1514,7 @@ Fselect_kbd_layout (lisp layout)
 lisp
 Fcurrent_kbd_layout ()
 {
-  HKL hkl = app.kbdq.get_kbd_layout ();
+  HKL hkl = active_app_frame().kbdq.get_kbd_layout ();
   char buf[256];
   if (get_kbd_layout_name (hkl, buf, sizeof buf)
       || get_kbd_layout_name (HKL (HIWORD (hkl)), buf, sizeof buf))

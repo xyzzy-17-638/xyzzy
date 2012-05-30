@@ -486,6 +486,8 @@ print_engine::print_engine (Buffer *bp, const printer_device &dev,
 {
   for (int i = 0; i < FONT_MAX; i++)
     pe_hfonts[i] = 0;
+
+  b_fold_columns = pe_bp->get_first_fold_columns(); // What should I do?
 }
 
 void
@@ -867,7 +869,7 @@ print_engine::paint_jisx0212 (PaintCtx &ctx, Char cc) const
       int o = l == 2 ? pe_offset2x[FONT_JP] : pe_offset[FONT_JP].x;
       SelectObject (ctx.hdc, pe_hfonts[FONT_JP]);
       ExtTextOutW (ctx.hdc, ctx.x + o, ctx.y + pe_offset[FONT_JP].y,
-                   0, 0, &wc, 1, 0);
+                   0, 0, (LPCWSTR)&wc, 1, 0);
     }
   else
     {
@@ -888,7 +890,7 @@ print_engine::paint_full_width (PaintCtx &ctx, Char cc, int f) const
     {
       SelectObject (ctx.hdc, pe_hfonts[f]);
       ExtTextOutW (ctx.hdc, ctx.x + pe_offset[f].x, ctx.y + pe_offset[f].y,
-                   0, 0, &wc, 1, 0);
+                   0, 0, (LPCWSTR)&wc, 1, 0);
     }
   else
     {
@@ -909,7 +911,7 @@ print_engine::paint_latin (PaintCtx &ctx, Char cc, int f) const
     {
       SelectObject (ctx.hdc, pe_hfonts[f]);
       ExtTextOutW (ctx.hdc, ctx.x + pe_offset[f].x, ctx.y + pe_offset[f].y,
-                   0, 0, &wc, 1, 0);
+                   0, 0, (LPCWSTR)&wc, 1, 0);
     }
   else
     {
@@ -940,7 +942,7 @@ print_engine::paint_lucida (PaintCtx &ctx, Char cc) const
           const lucida_spacing *p = &lucida_spacing_table[wc - UNICODE_SMLCDM_MIN];
           o = p->a >= 0 ? 0 : -p->a * pe_cell.cy / LUCIDA_BASE_HEIGHT;
         }
-      ExtTextOutW (ctx.hdc, ctx.x + o, ctx.y, 0, 0, &wc, 1, 0);
+      ExtTextOutW (ctx.hdc, ctx.x + o, ctx.y, 0, 0, (LPCWSTR)&wc, 1, 0);
       DeleteObject (SelectObject (ctx.hdc, of));
     }
   else
@@ -969,7 +971,7 @@ print_engine::paint_line (HDC hdc, int x, int y, Point &cur_point, long &linenum
   ctx.column = 0;
 
   if (pe_bp->bolp (point)
-      || (pe_bp->b_fold_columns != Buffer::FOLD_NONE
+      || (b_fold_columns != Buffer::FOLD_NONE
           && pe_bp->linenum_mode () != Buffer::LNMODE_LF))
     {
       if (hdc && pe_settings.ps_print_linenum)
@@ -1698,26 +1700,26 @@ print_engine::set_print_range () const
       if (start > end)
         swap (start, end);
       pe_bp->set_point (point, 0);
-      if (pe_bp->b_fold_columns == Buffer::FOLD_NONE)
+      if (b_fold_columns == Buffer::FOLD_NONE)
         {
           pe_bp->linenum_point (point, start);
           pe_bp->goto_bol (point);
         }
       else
         {
-          pe_bp->folded_linenum_point (point, start);
-          pe_bp->folded_goto_bol (point);
+          pe_bp->folded_linenum_point (point, b_fold_columns, start);
+          pe_bp->folded_goto_bol (point, b_fold_columns);
         }
       r.p1 = point.p_point;
-      if (pe_bp->b_fold_columns == Buffer::FOLD_NONE)
+      if (b_fold_columns == Buffer::FOLD_NONE)
         {
           pe_bp->linenum_point (point, end);
           pe_bp->goto_eol (point);
         }
       else
         {
-          pe_bp->folded_linenum_point (point, end);
-          pe_bp->folded_goto_eol (point);
+          pe_bp->folded_linenum_point (point, b_fold_columns, end);
+          pe_bp->folded_goto_eol (point, b_fold_columns);
         }
       r.p2 = point.p_point;
     }
@@ -1813,16 +1815,16 @@ print_engine::doprint1 (HWND hwnd)
   di.lpszDocName = docname;
 
   user_abort = 0;
-  HWND printing = CreateDialog (app.hinst, MAKEINTRESOURCE (IDD_PRINTING),
-                                app.toplev, printing_dlgproc);
+  HWND printing = CreateDialog (active_app_frame().hinst, MAKEINTRESOURCE (IDD_PRINTING),
+                                active_app_frame().toplev, printing_dlgproc);
   SetDlgItemText (printing, IDC_DOCNAME, docname);
   ShowWindow (printing, SW_SHOW);
   UpdateWindow (printing);
-  EnableWindow (app.toplev, 0);
+  EnableWindow (active_app_frame().toplev, 0);
 
   if (StartDoc (pe_dev, &di) == SP_ERROR)
     {
-      EnableWindow (app.toplev, 1);
+      EnableWindow (active_app_frame().toplev, 1);
       DestroyWindow (printing);
       FEsimple_win32_error (GetLastError ());
     }
@@ -1865,7 +1867,7 @@ print_engine::doprint1 (HWND hwnd)
   else
     AbortDoc (pe_dev);
 
-  EnableWindow (app.toplev, 1);
+  EnableWindow (active_app_frame().toplev, 1);
   DestroyWindow (printing);
 
   if (user_abort)
@@ -1926,7 +1928,7 @@ int
 print_engine::notice (HWND hwnd, UINT id, UINT ids)
 {
   char b[256];
-  LoadString (app.hinst, ids, b, sizeof b);
+  LoadString (active_app_frame().hinst, ids, b, sizeof b);
   MsgBox (hwnd, b, TitleBarString, MB_OK | MB_ICONEXCLAMATION,
           xsymbol_value (Vbeep_on_error) != Qnil);
   if (id != UINT (-1))
@@ -1938,7 +1940,7 @@ int
 print_engine::notice (HWND hwnd, UINT id, UINT ids, int arg)
 {
   char fmt[256], b[512];
-  LoadString (app.hinst, ids, fmt, sizeof fmt);
+  LoadString (active_app_frame().hinst, ids, fmt, sizeof fmt);
   wsprintf (b, fmt, arg);
   MsgBox (hwnd, b, TitleBarString, MB_OK | MB_ICONEXCLAMATION,
           xsymbol_value (Vbeep_on_error) != Qnil);
@@ -2139,7 +2141,7 @@ get_glyph_width (Char cc, const glyph_width &gw)
         if (wc != ucs2_t (-1))
           {
             SelectObject (gw.hdc, gw.hfonts[f]);
-            GetTextExtentPoint32W (gw.hdc, &wc, 1, &sz);
+            GetTextExtentPoint32W (gw.hdc, (LPCWSTR)&wc, 1, &sz);
           }
         else
           {

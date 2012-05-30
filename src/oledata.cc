@@ -25,9 +25,26 @@ obj2bstr (lisp obj)
   BSTR bstr = SysAllocStringLen (0, l - 1);
   if (!bstr)
     FEstorage_error ();
-  i2w (obj, bstr);
+  i2w (obj, (ucs2_t *)bstr);
   return bstr;
 }
+
+class safe_array_locker
+{
+public:
+	safe_array_locker(SAFEARRAY *in_sa) : sa(in_sa)
+	{
+		hr = SafeArrayLock(sa);
+	}
+	~safe_array_locker()
+	{
+		SafeArrayUnlock(sa);
+	}
+	HRESULT success_p() { return hr; }
+	HRESULT hr;
+	SAFEARRAY *sa;
+
+};
 
 static lisp
 variant2obj (VARIANT *v)
@@ -44,14 +61,20 @@ variant2obj (VARIANT *v)
           ole_error (SafeArrayGetLBound (sa, 1, &l));
           ole_error (SafeArrayGetUBound (sa, 1, &u));
           lisp object = make_vector (u - l + 1, Qnil);
-          for (lisp *vec = xvector_contents (object); l <= u; l++, vec++)
-            {
-              VARIANT variant;
-              bzero (&variant, sizeof variant);
-              safe_variant sv (variant);
-              ole_error (SafeArrayGetElement (sa, &l, &variant));
-              *vec = variant2obj (&variant);
-            }
+		  {
+			  safe_array_locker locker(sa);
+			  ole_error (locker.success_p());
+			  VARIANT variant;
+			  VariantInit(&variant);
+
+			  for (lisp *vec = xvector_contents (object); l <= u; l++, vec++)
+				{
+				  safe_variant sv (variant);
+				  V_VT(&variant) = (V_VT(v) & ~VT_ARRAY) | VT_BYREF;
+				  ole_error (SafeArrayPtrOfIndex(sa, &l, &V_BYREF(&variant)));
+				  *vec = variant2obj (&variant);
+				}
+		  }
           return object;
         }
       return FEprogram_error (Ecannot_convert_from_variant);
@@ -174,6 +197,50 @@ public:
   SAFEARRAY *finish () {SAFEARRAY *x = sa; sa = 0; return x;}
 };
 
+
+static bool
+inside_byte (long val)
+{
+	return (val & (~0xff)) == 0;
+}
+
+
+static bool
+is_bytearray (const lisp *vec, int len)
+{
+  for (long i = 0; i < len; i++, vec++)
+    {
+	  if(!immediatep(*vec))
+		  return false;
+      if (!short_int_p (*vec)) // we convert UI1 to fixnum, not char. I only support fixnum->byte array.
+		  return false;
+	  long lval = xshort_int_value(*vec);
+	  if(!inside_byte(lval))
+		  return false;
+    }
+  return true;
+}
+
+static SAFEARRAY *
+vector2bytearray (const lisp *vec, int len)
+{
+  SAFEARRAYBOUND b;
+  b.lLbound = 0;
+  b.cElements = len;
+  safe_array sa;
+  if (!sa.create (VT_UI1, 1, &b))
+    FEstorage_error ();
+
+  ole_error (sa.lock ());
+  for (long i = 0; i < len; i++, vec++)
+    {
+	  BYTE byte = (xshort_int_value(*vec)&0xff);
+      ole_error (SafeArrayPutElement (sa, &i, &byte));
+    }
+  ole_error (sa.unlock ());
+  return sa.finish ();
+}
+
 static SAFEARRAY *
 vector2variant (const lisp *vec, int len)
 {
@@ -220,6 +287,7 @@ list2variant (lisp list)
   ole_error (sa.unlock ());
   return sa.finish ();
 }
+
 
 /*GENERIC_FUNCTION*/
 static void
@@ -298,9 +366,22 @@ obj2variant (lisp object, VARIANT &variant)
 
         case Tsimple_vector:
         case Tcomplex_vector:
-          V_VT (&variant) = VT_VARIANT | VT_ARRAY;
-          V_ARRAY (&variant) = vector2variant (xvector_contents (object),
-                                               xvector_length (object));
+		  // special handling for bytearray.
+		  // I treat safe array of VT_UI1 as vector of fixnum.
+		  // If user just pass it to another OLE method, expectation is it just work.
+		  // So I only support this situation.
+		  if(is_bytearray(xvector_contents (object), xvector_length (object)))
+		  {
+			  V_VT (&variant) = VT_UI1 | VT_ARRAY;
+			  V_ARRAY (&variant) = vector2bytearray (xvector_contents (object),
+												   xvector_length (object));
+		  }
+		  else
+		  {
+			  V_VT (&variant) = VT_VARIANT | VT_ARRAY;
+			  V_ARRAY (&variant) = vector2variant (xvector_contents (object),
+												   xvector_length (object));
+		  }
           return;
 
         case Tcons:
@@ -866,7 +947,7 @@ DevStudio/SharedIDE/bin/ide/DEVDBG.PKG
 (set-ole-event-handler app "WindowActivate" #'(lambda (&rest x)))
 
 (require "ole")
-(setq deb #{app.debugger})
+(setq deb #{active_app_frame().debugger})
 (ole-create-event-sink deb "IDispDebuggerEvents" "DevStudio/SharedIDE/bin/ide/DEVDBG.PKG")
 
  */

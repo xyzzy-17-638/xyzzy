@@ -7,6 +7,7 @@ class buffer_info
 {
   const Window *const b_wp;
   const Buffer *const b_bufp;
+  const ApplicationFrame *const b_app;
   char **const b_posp;
   char **const b_percentp;
   int *const b_ime;
@@ -14,8 +15,8 @@ class buffer_info
 
   char *minor_mode (lisp, char *, char *, int &) const;
 public:
-  buffer_info (const Window *wp, const Buffer *bp, char **posp, int *ime, char **percentp)
-       : b_wp (wp), b_bufp (bp), b_posp (posp), b_ime (ime), b_percentp(percentp) {}
+  buffer_info (const ApplicationFrame *app, const Window *wp, const Buffer *bp, char **posp, int *ime, char **percentp)
+       : b_wp (wp), b_bufp (bp), b_app(app), b_posp (posp), b_ime (ime), b_percentp(percentp) {}
   char *format (lisp, char *, char *) const;
   char *modified (char *, int) const;
   char *read_only (char *, int) const;
@@ -36,6 +37,7 @@ public:
   char *host_name (char *, char *, int) const;
   char *process_id (char *, char *) const;
   char *percent(char *, char *) const;
+  char *frame_index(char *, char *, const ApplicationFrame* app1) const;
 };
 
 #endif

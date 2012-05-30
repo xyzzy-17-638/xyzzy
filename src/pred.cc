@@ -103,6 +103,9 @@ Ftype_of (lisp object)
         case Twindow:
           return Qwindow;
 
+		case Tappframe:
+		  return Qappframe;
+
         case Tbuffer:
           return Qbuffer;
 

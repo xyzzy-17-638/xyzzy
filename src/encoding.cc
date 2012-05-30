@@ -618,15 +618,15 @@ utf_to_internal_stream::per_lang_putw (int lang)
     default:
     case ENCODING_LANG_JP:
     case ENCODING_LANG_JP2:
-      return &putw_jp;
+	  return &utf_to_internal_stream::putw_jp;
 
     case ENCODING_LANG_KR:
     case ENCODING_LANG_CN_GB:
     case ENCODING_LANG_CN_BIG5:
-      return &putw_gen;
+      return &utf_to_internal_stream::putw_gen;
 
     case ENCODING_LANG_CN:
-      return &putw_cn;
+      return &utf_to_internal_stream::putw_cn;
     }
 }
 
@@ -828,33 +828,14 @@ utf8_to_internal_stream::refill_internal ()
       int c = s_in.get ();
       if (c == eof)
         break;
-      u_char nbits = utf8_chtab[c];
-      c &= utf8_chmask[nbits];
-      switch (nbits)
+      try
         {
-        case 7:
-          putw (c);
-          break;
-
-        case 0:
-        case 6:
-          /* invalid code */
-          break;
-
-        default:
-          {
-            ucs4_t code = c;
-            do
-              {
-                c = s_in.get ();
-                if (c == eof)
-                  return;
-                code = (code << 6) | (c & 0x3f);
-              }
-            while (++nbits < 6);
+          ucs4_t code = getch_utf8_to_ucs4 (c, s_in);
+          if (code != UCS4_EOF)
             putl (code);
-            break;
-          }
+        }
+      catch (std::exception)
+        {
         }
     }
 }
@@ -1236,7 +1217,8 @@ internal_to_iso2022_stream::select_designation (int ccs) const
 {
   if (ccs == ccs_usascii)
     return 0;
-  for (int i = 0; i < 4; i++)
+  int i;
+  for (i = 0; i < 4; i++)
     if (s_initial[i] == ccs)
       return i;
   for (int i = 0; i < 4; i++)
@@ -1767,8 +1749,8 @@ void
 internal_to_utf7_stream::encode_b64 ()
 {
   int n = s_nb - s_nb % 3;
-  const u_char *b, *const be = s_b + n;
-  for (b = s_b; b < be; b += 3)
+  const u_char *b, *be;
+  for (b = s_b, be = s_b + n; b < be; b += 3)
     {
       put (s_b64[(b[0] >> 2) & 63]);
       put (s_b64[((b[0] << 4) | (b[1] >> 4)) & 63]);

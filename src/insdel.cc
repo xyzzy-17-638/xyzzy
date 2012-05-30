@@ -9,7 +9,8 @@ void
 Buffer::check_valid () const
 {
   long nchars = 0;
-  for (const Chunk *cp = b_chunkb; cp; cp = cp->c_next)
+  const Chunk *cp = b_chunkb;
+  for (; cp; cp = cp->c_next)
     {
       nchars += cp->c_used;
       if (!cp->c_next)
@@ -65,7 +66,7 @@ Buffer::modify ()
   b_modified_count++;
   b_nlines = -1;
   b_need_auto_save = 1;
-  b_nfolded = -1;
+  set_nfolded_all(-1);
   b_stream_cache.p_chunk = 0;
 }
 
@@ -89,7 +90,7 @@ void
 Buffer::modify_chunk (Chunk *cp) const
 {
   cp->c_nlines = -1;
-  cp->c_nbreaks = -1;
+  cp->invalidate_fold_info();
   cp->c_bstate = syntax_state::SS_INVALID;
 }
 
@@ -367,6 +368,8 @@ Buffer::move_gap (Point &w_point, int requested)
   return allocate_new_chunks (w_point, requested);
 }
 
+extern ApplicationFrame *first_app_frame();
+
 void
 Buffer::adjust_insertion (const Point &point, int size)
 {
@@ -400,20 +403,22 @@ Buffer::adjust_insertion (const Point &point, int size)
       ADJINS (xmarker_point (x));
     }
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    if (wp->w_bufp == this)
-      {
-        ADJINS (wp->w_point.p_point);
-        if (&wp->w_point != &point)
-          set_point_no_restrictions (wp->w_point, wp->w_point.p_point);
-        ADJINS (wp->w_mark);
-        ADJINS (wp->w_selection_point);
-        ADJINS (wp->w_selection_marker);
-        ADJINS (wp->w_reverse_region.p1);
-        ADJINS (wp->w_reverse_region.p2);
-        ADJINS (wp->w_disp);
-        ADJINS (wp->w_last_disp);
-      }
+  for (ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next) {
+	  for (Window *wp = app1->active_frame.windows; wp; wp = wp->w_next)
+		if (wp->w_bufp == this)
+		  {
+			ADJINS (wp->w_point.p_point);
+			if (&wp->w_point != &point)
+			  set_point_no_restrictions (wp->w_point, wp->w_point.p_point);
+			ADJINS (wp->w_mark);
+			ADJINS (wp->w_selection_point);
+			ADJINS (wp->w_selection_marker);
+			ADJINS (wp->w_reverse_region.p1);
+			ADJINS (wp->w_reverse_region.p2);
+			ADJINS (wp->w_disp);
+			ADJINS (wp->w_last_disp);
+		  }
+  }
 
   for (WindowConfiguration *wc = WindowConfiguration::wc_chain;
        wc; wc = wc->wc_prev)
@@ -469,7 +474,8 @@ Buffer::insert_chars_internal (Point &point, const insertChars *ichars,
                                int nargs, int repeat)
 {
   double total_length = 0;
-  for (int i = 0; i < nargs; i++)
+  int i;
+  for (i = 0; i < nargs; i++)
     total_length += ichars[i].length;
   total_length *= repeat;
   if (total_length > INT_MAX)
@@ -843,8 +849,8 @@ Buffer::adjust_deletion (const Point &point, int size)
       lisp x = xcar (marker);
       ADJDEL (xmarker_point (x));
     }
-
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  all_window_iterator itr;
+  for (Window *wp = itr.begin(); wp; wp = itr.next())
     if (wp->w_bufp == this)
       {
         if (point.p_point < wp->w_disp && point.p_point + size > wp->w_disp)
@@ -1222,7 +1228,7 @@ Fcopy_to_clipboard (lisp string)
     }
 
   int result = 0;
-  if (open_clipboard (app.toplev))
+  if (open_clipboard (active_app_frame().toplev))
     {
       if (EmptyClipboard ())
         for (int i = 0; i < numberof (clp) && clp[i].hgl; i++)
@@ -1491,7 +1497,7 @@ Fget_clipboard_data ()
 {
   int result = -1;
   lisp lstring = make_simple_string ();
-  if (open_clipboard (app.toplev))
+  if (open_clipboard (active_app_frame().toplev))
     {
       lisp encoding = symbol_value (Vclipboard_char_encoding,
                                     selected_buffer ());

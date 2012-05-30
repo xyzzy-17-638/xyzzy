@@ -21,18 +21,19 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
+    <PlatformToolset>v100</PlatformToolset>
     <GenerateDebugInformation>true</GenerateDebugInformation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>NotSet</CharacterSet>
-    <PlatformToolset>Windows7.1SDK</PlatformToolset>
+    <PlatformToolset>v100</PlatformToolset>
     <GenerateDebugInformation>true</GenerateDebugInformation>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -81,12 +82,16 @@
       <AdditionalDependencies>comctl32.lib;imm32.lib;mpr.lib;rpcrt4.lib;wsock32.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)src\zlib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>$(GenerateDebugInformation)</GenerateDebugInformation>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>NotSet</SubSystem>
       <StackReserveSize>0x2000000</StackReserveSize>
       <TargetMachine>MachineX86</TargetMachine>
       <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
-      <DataExecutionPrevention>false</DataExecutionPrevention>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <AdditionalOptions>/SUBSYSTEM:WINDOWS,5.0 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PostBuildEvent>
+      <Command>editbin /subsystem:windows,5.0 $(OutDir)$(TargetName)$(TargetExt)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -119,14 +124,18 @@
       <AdditionalDependencies>comctl32.lib;imm32.lib;mpr.lib;rpcrt4.lib;wsock32.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)src\zlib\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>$(GenerateDebugInformation)</GenerateDebugInformation>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>NotSet</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
       <StackReserveSize>0x2000000</StackReserveSize>
-      <DataExecutionPrevention>false</DataExecutionPrevention>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+      <AdditionalOptions>/SUBSYSTEM:WINDOWS,5.0 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PostBuildEvent>
+      <Command>editbin /subsystem:windows,5.0 $(OutDir)$(TargetName)$(TargetExt)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\alloc.cc" />
@@ -171,6 +180,7 @@
     <ClCompile Include="..\src\filer.cc" />
     <ClCompile Include="..\src\fnkey.cc" />
     <ClCompile Include="..\src\font.cc" />
+    <ClCompile Include="..\src\frame.cc" />
     <ClCompile Include="..\src\gime.cc" />
     <ClCompile Include="..\src\glob.cc" />
     <ClCompile Include="..\src\guess.cc" />
@@ -242,10 +252,12 @@
     <ClCompile Include="..\src\toplev.cc" />
     <ClCompile Include="..\src\ucs2.cc" />
     <ClCompile Include="..\src\undo.cc" />
+    <ClCompile Include="..\src\unzip.cc" />
     <ClCompile Include="..\src\usertab.cc" />
     <ClCompile Include="..\src\usertool.cc" />
     <ClCompile Include="..\src\utils.cc" />
     <ClCompile Include="..\src\utimer.cc" />
+    <ClCompile Include="..\src\vc-compat.cc" />
     <ClCompile Include="..\src\vector.cc" />
     <ClCompile Include="..\src\version.cc" />
     <ClCompile Include="..\src\vfs.cc" />
@@ -419,6 +431,7 @@
     <ClInclude Include="..\src\thread.h" />
     <ClInclude Include="..\src\timer.h" />
     <ClInclude Include="..\src\trace.h" />
+    <ClInclude Include="..\src\unzip.h" />
     <ClInclude Include="..\src\utils.h" />
     <ClInclude Include="..\src\utimer.h" />
     <ClInclude Include="..\src\vector.h" />
@@ -437,6 +450,7 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
   <Target Name="MergeResourceFiles" Inputs="$(SolutionDir)src\xyzzy.rc;$(SolutionDir)src\version.h;$(SolutionDir)src\version-rc.h" Outputs="$(SolutionDir)src\gen\xyzzy.rc">
     <Exec Command="type $(SolutionDir)src\xyzzy.rc $(SolutionDir)src\version-rc.h &gt; $(SolutionDir)src\gen\xyzzy.rc 2&gt; nul" />
@@ -445,6 +459,13 @@
   <ItemGroup>
     <LispFiles Include="$(SolutionDir)lisp\**\*.*" />
     <EtcFiles Include="$(SolutionDir)etc\**\*.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="..\src\vc-compat-entry.asm">
+      <FileType>Document</FileType>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">PLATVER=$(PlatformToolsetVersion)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">PLATVER=$(PlatformToolsetVersion)</PreprocessorDefinitions>
+    </MASM>
   </ItemGroup>
   <PropertyGroup>
     <LispOutputFiles>@(LispFiles->'$(TargetDir)lisp\%(RecursiveDir)%(Filename)%(Extension)')</LispOutputFiles>

@@ -318,7 +318,7 @@ public:
 	  m_ml_size.cy = winsize.cy;
   }
 
-  static int calc_percent(Buffer *bufp, point_t point);
+  static int calc_percent(const Buffer *bufp, point_t point);
 
 private:
   int paint_percent (HDC hdc);
@@ -390,6 +390,7 @@ private:
 };
 
 struct wheel_info;
+class ApplicationFrame;
 
 struct Window
 {
@@ -489,6 +490,8 @@ struct Window
   long w_selection_column;
   Region w_selection_region;
 
+  ApplicationFrame* w_owner;
+
   Buffer::selection_type w_reverse_temp;
   Region w_reverse_region;
 
@@ -534,6 +537,9 @@ struct Window
                            const XCOLORREF * = 0, const XCOLORREF * = 0);
   void change_color ();
 
+  // just for utility
+  int get_fold_columns() const;
+
   int flags () const;
   void set_flags (int);
   void clr_flags (int);
@@ -546,17 +552,36 @@ struct Window
   void process_hscroll (int);
   void wheel_scroll (const wheel_info &);
 
-  Window (int = 0, int = 0);
+  Window (ApplicationFrame *owner, int = 0, int = 0);
   Window (const Window &);
   void init (int, int);
   ~Window ();
-  static void create_default_windows ();
+  static void create_default_windows (ApplicationFrame* owner);
 
   void save_buffer_params ();
   void set_buffer_params (Buffer *);
   void set_buffer (Buffer *);
   void calc_client_size (int, int);
   void reframe ();
+  long folded_point_linenum (point_t) const;
+  long folded_point_linenum (const Point &point) const
+    {return folded_point_linenum (point.p_point);}
+  long folded_point_column (const Point &) const;
+  void folded_go_bol (Point &point) const { w_bufp->folded_go_bol(point, get_fold_columns()); }
+  void folded_go_eol (Point &point) const { w_bufp->folded_go_eol(point, get_fold_columns()); }
+  void folded_goto_bol(Point &point) const { w_bufp->folded_goto_bol(point, get_fold_columns()); }
+  void folded_goto_eol(Point &point) const { w_bufp->folded_goto_eol(point, get_fold_columns()); }
+  long folded_forward_column (Point &point, long ncolumns, long curcol, int can_exceed, int restrict) const {
+      return w_bufp->folded_forward_column(point, get_fold_columns(), ncolumns, curcol, can_exceed, restrict); 
+  }
+  long folded_goto_column (Point &point, long column, int exceed) const {
+	  return w_bufp->folded_goto_column(point, get_fold_columns(), column, exceed);
+  }
+  long folded_linenum_point (Point &pbuf, long goal) {
+	  return w_bufp->folded_linenum_point(pbuf, get_fold_columns(), goal);
+  }
+
+
   void paint_glyphs (HDC, HDC, const glyph_t *, const glyph_t *, const glyph_t *,
                      char *, const INT *, int, int, int) const;
   void paint_line (HDC, HDC, glyph_data *, const glyph_data *,
@@ -601,29 +626,37 @@ struct Window
     }
   int caret_line () const
     {return w_linenum - w_last_top_linenum;}
-  static int caret_xpixel (int column)
-    {return (column * app.text_font.cell ().cx
-             + app.text_font.cell ().cx / 2);}
-  static int caret_ypixel (int line)
-    {return line * app.text_font.cell ().cy;}
+  int caret_xpixel (int column) const
+    {return (column * w_owner->text_font.cell ().cx
+             + w_owner->text_font.cell ().cx / 2);}
+  int caret_ypixel (int line) const
+    {return line * w_owner->text_font.cell ().cy;}
   int caret_x () const
     {return caret_xpixel (caret_column ());}
   int caret_y () const
     {return caret_ypixel (caret_line ());}
   void hide_caret () const;
   void update_caret () const;
-  static void update_last_caret ();
-  static void update_caret (HWND, int, int, int, int, COLORREF);
-  static void delete_caret ();
-  static void compute_geometry (const SIZE & = app.active_frame.size,
-                                int = app.text_font.cell ().cy);
-  static void move_all_windows (int = 1);
-  static void repaint_all_windows ();
+  static void update_last_caret (ApplicationFrame* owner);
+  static void update_caret (ApplicationFrame *, HWND, int, int, int, int, COLORREF);
+  static void delete_caret (ApplicationFrame *owner);
+  static inline void compute_geometry (ApplicationFrame* owner)
+  {
+	  compute_geometry(owner, owner->active_frame.size);
+  }
+  static inline void compute_geometry (ApplicationFrame* owner, const SIZE &size)
+  {
+	  compute_geometry(owner, size, owner->text_font.cell ().cy);
+  }
+  static void compute_geometry (ApplicationFrame* owner, const SIZE &,
+                                int);
+  static void move_all_windows (ApplicationFrame* owner, int = 1);
+  static void repaint_all_windows (ApplicationFrame* owner);
   static void destroy_windows ();
 
   void split (int, int);
   int minibuffer_window_p () const;
-  static Window *minibuffer_window ();
+  static Window *minibuffer_window (ApplicationFrame* owner = &active_app_frame());
   void delete_other_windows ();
   void close ();
   static int count_windows ();
@@ -636,8 +669,8 @@ struct Window
     };
   int find_resizeable_edge (LONG RECT::*, LONG RECT::*, LONG RECT::*, LONG RECT::*) const;
   int find_resizeable_edges () const;
-  static Window *find_point_window (POINT &p);
-  static Window *find_scr_point_window (const POINT &, int, int *);
+  static Window *find_point_window (ApplicationFrame* owner, POINT &p);
+  static Window *find_scr_point_window (ApplicationFrame* owner, const POINT &, int, int *);
   void resize_edge (LONG RECT::*, LONG RECT::*, LONG RECT::*, LONG RECT::*) const;
   void resize_edge (int) const;
   int delete_window ();
@@ -645,7 +678,7 @@ struct Window
   void set_window ();
 
   static Window *coerce_to_window (lisp);
-  static Window *find_point_window (const POINT &, int &);
+  static Window *find_point_window (ApplicationFrame *owner, const POINT &, int &);
   Window *find_resizeable_window (LONG RECT::*, LONG RECT::*, LONG RECT::*, LONG RECT::*, LONG RECT::*) const;
   Window *find_horiz_window (LONG RECT::*) const;
   Window *find_vert_window (LONG RECT::*) const;
@@ -655,14 +688,14 @@ struct Window
   int get_vert_max (int, int) const;
   void change_vert_size (int, int, int);
   void change_horiz_size (int, int, int);
-  static int find_vert_order (int);
-  static int find_horiz_order (int);
+  static int find_vert_order (ApplicationFrame*, int);
+  static int find_horiz_order (ApplicationFrame*, int);
   int enlarge_window_horiz (int);
   int enlarge_window_vert (int);
   int enlarge_window (int, int);
 
-  static int frame_window_setcursor (HWND, WPARAM, LPARAM);
-  static int frame_window_resize (HWND, LPARAM, const POINT * = 0);
+  static int frame_window_setcursor (ApplicationFrame *owner, HWND, WPARAM, LPARAM);
+  static int frame_window_resize (ApplicationFrame* owner, HWND, LPARAM, const POINT * = 0);
   int frame_window_resize (HWND, const POINT &, int);
 
   int redraw_mode_line ();

@@ -207,7 +207,7 @@ bq_process (lisp x)
     FEprogram_error (Ecomma_atsign_after_backquote);
   if (xcar (x) == Qcomma_dot)
     FEprogram_error (Ecomma_dot_after_backquote);
-  lisp p, q;
+  lisp p,q;
   for (p = x, q = Qnil; consp (p); p = xcdr (p))
     {
       if (xcar (p) == Qcomma)

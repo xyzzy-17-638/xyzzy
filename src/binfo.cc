@@ -148,7 +148,7 @@ buffer_info::ime_mode (char *b, char *be) const
   if (!b_ime)
     return b;
   *b_ime = 1;
-  return stpncpy (b, (app.ime_open_mode == kbd_queue::IME_MODE_ON
+  return stpncpy (b, (active_app_frame().ime_open_mode == kbd_queue::IME_MODE_ON
                       ? "‚ " : "--"),
                   be - b);
 }
@@ -195,15 +195,23 @@ buffer_info::percent (char *b, char *be) const
   else if (b_bufp && b_wp)
     {
       char tem[64];
-	  if(b_bufp->b_nchars > 0)
-	      sprintf_s (tem, 64, "%d", (100*b_wp->w_point.p_point) / b_bufp->b_nchars);
-	  else
-		  sprintf_s (tem, 64, "100");
+	  sprintf_s(tem, 64, "%d", mode_line_percent_painter::calc_percent(b_bufp, b_wp->w_point.p_point));
       b = stpncpy (b, tem, be - b);
     }
   return b;
 }
 
+char *
+buffer_info::frame_index (char *b, char *be, const ApplicationFrame* app1) const
+{
+  if (app1)
+    {
+      char tem[64];
+      sprintf_s (tem, 64, "%d", app1->frame_index);
+      b = stpncpy (b, tem, be - b);
+    }
+  return b;
+}
 
 char *
 buffer_info::format (lisp fmt, char *b, char *be) const
@@ -307,6 +315,10 @@ buffer_info::format (lisp fmt, char *b, char *be) const
 
             case '$':
               b = process_id (b, be);
+              break;
+
+            case 'x':
+              b = frame_index (b, be, b_app);
               break;
             }
         }

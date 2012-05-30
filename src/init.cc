@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ed.h"
+#include <tlhelp32.h>
 #include "ctl3d.h"
 #include "environ.h"
 #include "except.h"
@@ -28,41 +29,22 @@ const char Application::ClientClassName[] = "   ";
 const char Application::ModelineClassName[] = "    ";
 const char FunctionKeyClassName[] = "     ";
 
-Application app;
+Application g_app;
 
 char enable_quit::q_enable;
+int defer_change_focus::s_count = 0;
+ApplicationFrame* defer_change_focus::s_focus_candidate = 0;
 
 Application::Application ()
-     : mouse (kbdq)
 {
-  default_tab_columns = 8;
-  auto_save_count = 0;
   toplevel_is_active = 0;
-  ime_composition = 0;
-  ime_open_mode = kbd_queue::IME_MODE_OFF;
-  sleep_timer_exhausted = 0;
-  last_vkeycode = -1;
-  kbd_repeat_count = 0;
-  wait_cursor_depth = 0;
-  f_in_drop = 0;
-  drop_window = 0;
-  drag_window = 0;
-  drag_buffer = 0;
-  f_protect_quit = 0;
-  hwnd_clipboard = 0;
-  last_cmd_tick = GetTickCount ();
-  f_auto_save_pending = 0;
-  default_caret_blink_time = 0;
-  last_blink_caret = 0;
-  lquit_char = make_char ('G' - '@');
-  quit_vkey = 'G';
-  quit_mod = MOD_CONTROL;
   ini_file_path = 0;
-  minibuffer_prompt_column = -1;
+  default_tab_columns = 8;
 
   int tem;
   initial_stack = &tem;
   in_gc = 0;
+  startupEvent = NULL;
   exit_code = 0;
 }
 
@@ -70,6 +52,51 @@ Application::~Application ()
 {
   xfree (ini_file_path);
 }
+
+errno_t
+ResolveModuleRelativePath(char *dest, int destSize, const char* relativeDir, const char *file)
+{
+	assert(relativeDir == 0 || relativeDir[strlen(relativeDir)-1] == '\\');
+    char path_name[_MAX_PATH];
+    char drive[_MAX_DRIVE];
+    char dir[_MAX_DIR];
+	char tmp_fname[_MAX_FNAME];
+	char tmp_ext[_MAX_EXT];
+
+	errno_t err = ResolveModuleRelativeDir(path_name, _MAX_PATH, relativeDir);
+	if(err != 0) return err;
+	err = _splitpath_s(path_name, drive,  _MAX_DRIVE, dir, _MAX_DIR,  NULL, 0,  NULL, 0);
+	if(err != 0) return err; // ??
+
+	err = _splitpath_s(file, NULL, 0, NULL, 0, tmp_fname, _MAX_FNAME, tmp_ext, _MAX_EXT);
+	if(err != 0) return err;
+
+	err = _makepath_s(dest, destSize, drive, dir, tmp_fname, tmp_ext);
+	return err;	
+}
+
+
+errno_t
+ResolveModuleRelativeDir(char *dest, int destSize, const char* relativeDir)
+{
+    char module_path_name[_MAX_PATH];
+    char drive[_MAX_DRIVE];
+    char dir[_MAX_DIR];
+
+	GetModuleFileName (0, module_path_name, sizeof module_path_name);
+	_splitpath_s(module_path_name, drive,  _MAX_DRIVE, dir, _MAX_DIR,  NULL, 0,  NULL, 0);
+	errno_t err;
+	if(relativeDir != 0)
+	{
+		err = strcat_s(dir, _MAX_DIR, relativeDir);
+		if(err != 0) {
+			return err;
+		}
+	}
+	err = _makepath_s(dest, destSize, drive, dir, NULL, NULL);
+	return err;
+}
+
 
 static void
 init_module_dir ()
@@ -120,6 +147,15 @@ init_home_dir ()
   static const char xyzzyhome[] = "XYZZYHOME";
   static const char cfgInit[] = "init";
 
+  // top priority is USBInit.
+  if (read_conf (cfgUsbInit, cfgUsbHomeDir, path, sizeof path))
+  {
+	  char absPath[PATH_MAX];
+	  errno_t err = ResolveModuleRelativeDir(absPath, PATH_MAX, path);
+	  if(!err && init_home_dir (absPath))
+		  return;
+  }
+
   if (read_conf (cfgInit, "homeDir", path, sizeof path)
       && init_home_dir (path))
     return;
@@ -168,6 +204,18 @@ init_load_path ()
            xsymbol_value (Vload_path));
 }
 
+static bool
+try_assign_config_path(char *path)
+{
+    DWORD a = WINFS::GetFileAttributes (path);
+    if (a != DWORD (-1) && a & FILE_ATTRIBUTE_DIRECTORY)
+    {
+        xsymbol_value (Quser_config_path) = make_path (path);
+		return true;
+	}
+	return false;
+}
+
 static void
 init_user_config_path (const char *config_path)
 {
@@ -179,14 +227,22 @@ init_user_config_path (const char *config_path)
       int l = WINFS::GetFullPathName (config_path, sizeof path, path, &tem);
       if (l && l < sizeof path)
         {
-          DWORD a = WINFS::GetFileAttributes (path);
-          if (a != DWORD (-1) && a & FILE_ATTRIBUTE_DIRECTORY)
-            {
-              xsymbol_value (Quser_config_path) = make_path (path);
-              return;
-            }
+		  if(try_assign_config_path(path))
+			  return;
         }
     }
+
+  if(g_app.ini_file_path)
+  {
+	  char path[_MAX_PATH];
+	  if(read_conf(cfgUsbInit, cfgUsbConfigDir, path, _MAX_PATH))
+	  {
+		  char absPath[_MAX_PATH];
+		  errno_t err = ResolveModuleRelativeDir(absPath, _MAX_PATH, path);
+		  if(!err && try_assign_config_path(absPath))
+			  return;
+	  }
+  }
 
   char *path = (char *)alloca (w2sl (xsymbol_value (Qmodule_dir))
                                + w2sl (xsymbol_value (Vuser_name))
@@ -199,16 +255,46 @@ init_user_config_path (const char *config_path)
   *p++ = '/';
   strcpy (p, sysdep.windows_short_name);
   WINFS::CreateDirectory (path, 0);
-  DWORD a = WINFS::GetFileAttributes (path);
-  if (a != DWORD (-1) && a & FILE_ATTRIBUTE_DIRECTORY)
-    xsymbol_value (Quser_config_path) = make_path (path);
-  else
-    xsymbol_value (Quser_config_path) = xsymbol_value (Qmodule_dir);
+  if(!try_assign_config_path(path))
+    xsymbol_value (Quser_config_path) = xsymbol_value (Qmodule_dir); //fail all, use module dir. 
+}
+
+static bool
+FileExists (const char* path) {
+  HANDLE h = WINFS::CreateFile (path, GENERIC_READ, 0, 0, OPEN_EXISTING, 0, 0);
+  if (h == INVALID_HANDLE_VALUE)
+	  return false;
+  CloseHandle (h);
+  return true;
 }
 
 static void
-init_user_inifile_path (const char *ini_file)
+try_load_inifile_of_modulepath()
 {
+   char path[_MAX_PATH];
+   errno_t err = ResolveModuleRelativePath(path, _MAX_PATH, 0, "xyzzy.ini");
+   if(err != 0)
+      return;
+   if(FileExists(path))
+   {
+      g_app.ini_file_path = xstrdup (path);
+   }
+}
+
+static void
+init_user_inifile_path_1st_phase (const char *ini_file)
+{
+  // if there is no ini file specification, use the same place as xyzzy.exe if exist.
+  if(!ini_file)
+    try_load_inifile_of_modulepath();
+}
+
+static void
+init_user_inifile_path_2nd_phase (const char *ini_file)
+{
+  if(g_app.ini_file_path)
+	  return;
+
   if (!ini_file)
     ini_file = getenv ("XYZZYINIFILE");
   if (ini_file && find_slash (ini_file))
@@ -222,7 +308,7 @@ init_user_inifile_path (const char *ini_file)
           if (h != INVALID_HANDLE_VALUE)
             {
               CloseHandle (h);
-              app.ini_file_path = xstrdup (path);
+              g_app.ini_file_path = xstrdup (path);
               return;
             }
         }
@@ -234,16 +320,16 @@ init_user_inifile_path (const char *ini_file)
   char *path = (char *)alloca (w2sl (xsymbol_value (Quser_config_path))
                                + strlen (ini_file) + 32);
   strcpy (w2s (path, xsymbol_value (Quser_config_path)), ini_file);
-  app.ini_file_path = xstrdup (path);
+  g_app.ini_file_path = xstrdup (path);
 }
 
 static void
 init_dump_path ()
 {
-  if (!*app.dump_image)
+  if (!*g_app.dump_image)
     {
-      int l = GetModuleFileName (0, app.dump_image, PATH_MAX);
-      char *e = app.dump_image + l;
+      int l = GetModuleFileName (0, g_app.dump_image, PATH_MAX);
+      char *e = g_app.dump_image + l;
       if (l > 4 && !_stricmp (e - 4, ".exe"))
         e -= 3;
       else
@@ -255,13 +341,13 @@ init_dump_path ()
 static void
 init_env_symbols (const char *config_path, const char *ini_file)
 {
-  xsymbol_value (Vfeatures) = xcons (Kxyzzy, xcons (Kieee_floating_point, Qnil));
-  xsymbol_value (Qdump_image_path) = make_path (app.dump_image, 0);
+  xsymbol_value (Vfeatures) = xcons(Kmultiple_frames, xcons (Kxyzzy, xcons (Kieee_floating_point, Qnil)));
+  xsymbol_value (Qdump_image_path) = make_path (g_app.dump_image, 0);
   init_module_dir ();
   init_current_dir ();
   init_environ ();
   init_user_config_path (config_path);
-  init_user_inifile_path (ini_file);
+  init_user_inifile_path_2nd_phase (ini_file);
   init_home_dir ();
   init_load_path ();
   init_windows_dir ();
@@ -435,7 +521,8 @@ init_symbol_value_once ()
   xsymbol_value (Qsoftware_type) = make_string (ProgramName);
   xsymbol_value (Qsoftware_version) = make_string (VersionString);
   xsymbol_value (Qsoftware_version_display_string) =
-    make_string (DisplayVersionString);
+    strlen (DisplayVersionString) ?
+      make_string (DisplayVersionString) : make_string (VersionString);
 
   xsymbol_value (Qtemporary_string) = make_string_simple ("", 0);
 
@@ -509,11 +596,16 @@ init_symbol_value_once ()
   xsymbol_value (Vunicode_to_half_width) = Qt;
   xsymbol_value (Vcolor_page_enable_dir_p) = Qnil;
   xsymbol_value (Vcolor_page_enable_subdir_p) = Qnil;
+
+  xsymbol_value (Vwow64_enable_file_system_redirector) = Qt;
 }
 
 static void
 init_symbol_value ()
 {
+  // when root app constructor is called, Qnil is not yet initialized.
+  active_app_frame().lminibuffer_message = Qnil;
+  active_app_frame().lminibuffer_prompt = Qnil;
   xsymbol_value (Vquit_flag) = Qnil;
   xsymbol_value (Vinhibit_quit) = Qnil;
   xsymbol_value (Voverwrite_mode) = Qnil;
@@ -522,6 +614,7 @@ init_symbol_value ()
   xsymbol_value (Vsi_find_motion) = Qt;
   xsymbol_value (Vdefault_menu) = Qnil;
   xsymbol_value (Vlast_active_menu) = Qnil;
+  xsymbol_value (Vtracking_menu) = Qnil;
 
   xsymbol_value (Vreader_in_backquote) = Qnil;
   xsymbol_value (Vreader_preserve_white) = Qnil;
@@ -541,6 +634,35 @@ init_symbol_value ()
 
   xsymbol_value (Vsi_accept_kill_xyzzy) = Qt;
   xsymbol_value (Vlast_match_string) = Qnil;
+}
+
+static bool
+is_parent_process_wow64 ()
+{
+  bool ret = false;
+  typedef BOOL (WINAPI *ISWOW64PROCESS)(HANDLE, PBOOL);
+  static const ISWOW64PROCESS fnIsWow64Process = (ISWOW64PROCESS)GetProcAddress (GetModuleHandle ("KERNEL32"), "IsWow64Process");
+  HANDLE h = CreateToolhelp32Snapshot (TH32CS_SNAPPROCESS, 0);
+  PROCESSENTRY32 pe = { 0 };
+  pe.dwSize = sizeof (PROCESSENTRY32);
+  int pid = GetCurrentProcessId ();
+  if (Process32First (h, &pe))
+    {
+      do
+        {
+          if (pe.th32ProcessID == pid)
+            {
+              HANDLE processHandle = OpenProcess (PROCESS_QUERY_INFORMATION, 0, pe.th32ParentProcessID);
+              BOOL b = FALSE;
+              if (fnIsWow64Process && fnIsWow64Process (processHandle, &b))
+                {
+                  ret = (b != 0);
+                  break;
+                }
+            }
+        } while (Process32Next (h, &pe));
+    }
+  return ret;
 }
 
 static void
@@ -569,29 +691,37 @@ static int
 init_lisp_objects ()
 {
   const char *config_path = 0, *ini_file = 0;
-  *app.dump_image = 0;
+  *g_app.dump_image = 0;
+
+  bool redump = false;
 
   int ac;
   for (ac = 1; ac < __argc - 1; ac += 2)
     if (!strcmp (__argv[ac], "-image"))
       {
         char *tem;
-        int l = WINFS::GetFullPathName (__argv[ac + 1], sizeof app.dump_image,
-                                        app.dump_image, &tem);
-        if (!l || l >= sizeof app.dump_image)
-          *app.dump_image = 0;
+        int l = WINFS::GetFullPathName (__argv[ac + 1], sizeof g_app.dump_image,
+                                        g_app.dump_image, &tem);
+        if (!l || l >= sizeof g_app.dump_image)
+          *g_app.dump_image = 0;
       }
     else if (!strcmp (__argv[ac], "-config"))
       config_path = __argv[ac + 1];
     else if (!strcmp (__argv[ac], "-ini"))
       ini_file = __argv[ac + 1];
+    else if (!strcmp (__argv[ac], "-redump"))
+      redump  =true;
     else
       break;
 
   try
     {
+      if (!ini_file)
+        ini_file = getenv ("XYZZYINIFILE");
+      init_user_inifile_path_1st_phase(ini_file);
+
       init_dump_path ();
-      if ((ac < __argc || !check_dump_key ())
+      if ((!redump && (ac < __argc || !check_dump_key ()))
           && rdump_xyzzy ())
         {
           combine_syms ();
@@ -607,6 +737,7 @@ init_lisp_objects ()
       init_syntax_spec ();
       init_env_symbols (config_path, ini_file);
       xsymbol_value (Vconvert_registry_to_file_p) = boole (reg2ini ());
+      xsymbol_value (Vparent_process_wow64_p) = boole (is_parent_process_wow64 ());
       load_misc_colors ();
       init_command_line (ac);
       syntax_state::init_color_table ();
@@ -614,7 +745,7 @@ init_lisp_objects ()
     }
   catch (nonlocal_jump &)
     {
-      app.active_frame.selected = 0;
+      active_app_frame().active_frame.selected = 0;
       report_out_of_memory ();
       return 0;
     }
@@ -622,21 +753,28 @@ init_lisp_objects ()
 }
 
 static int
-init_editor_objects ()
+init_editor_objects (ApplicationFrame* app1, Buffer* iniBuf)
 {
   try
     {
-      Window::create_default_windows ();
-      create_default_buffers ();
+      Window::create_default_windows (app1);
+      if (iniBuf)
+	  {
+		  selected_window (app1)->set_buffer (iniBuf);
+	  }
+	  else
+        create_default_buffers ();
     }
   catch (nonlocal_jump &)
     {
-      app.active_frame.selected = 0;
+      app1->active_frame.selected = 0;
       report_out_of_memory ();
       return 0;
     }
   return 1;
 }
+
+
 
 lisp
 Fsi_startup ()
@@ -652,21 +790,21 @@ register_wndclasses (HINSTANCE hinst)
   wc.style = 0;
   wc.lpfnWndProc = toplevel_wndproc;
   wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
+  wc.cbWndExtra = sizeof(ApplicationFrame*);
   wc.hInstance = hinst;
   wc.hIcon = LoadIcon (hinst, MAKEINTRESOURCE (IDI_XYZZY));
   wc.hCursor = sysdep.hcur_arrow;
   wc.hbrBackground = 0;
   wc.lpszMenuName = 0;
   wc.lpszClassName = Application::ToplevelClassName;
-  app.atom_toplev = RegisterClass (&wc);
-  if (!app.atom_toplev)
+  active_app_frame().atom_toplev = RegisterClass (&wc);
+  if (!active_app_frame().atom_toplev)
     return 0;
 
   wc.style = 0;
   wc.lpfnWndProc = frame_wndproc;
   wc.cbClsExtra = 0;
-  wc.cbWndExtra = 0;
+  wc.cbWndExtra = sizeof(ApplicationFrame*);
   wc.hInstance = hinst;
   wc.hIcon = 0;
   wc.hCursor = sysdep.hcur_arrow;
@@ -783,12 +921,19 @@ sw_maximized_p (int sw)
   return sw == SW_SHOWMAXIMIZED;
 }
 
+static SIZE g_initial_size;
+
+
 static int
-init_app (HINSTANCE hinst, int passed_cmdshow, int &ole_initialized)
+init_root_app (HINSTANCE hinst, int passed_cmdshow, int &ole_initialized)
 {
   SetErrorMode (SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
   SetDllDirectory("");
-  app.toplev = 0;
+  g_app.in_gc = 0; // whatever.
+  g_app.startupEvent = CreateEvent (0, 0, 0, 0);
+  active_app_frame().toplev = 0;
+
+
 
   init_ucs2_table ();
 
@@ -814,7 +959,10 @@ init_app (HINSTANCE hinst, int passed_cmdshow, int &ole_initialized)
   if (!init_lisp_objects ())
     return 0;
 
-  app.hinst = hinst;
+  active_app_frame().lfp = make_appframe();
+  xappframe_fp (active_app_frame().lfp) = &active_app_frame();
+
+  active_app_frame().hinst = hinst;
   if (!register_wndclasses (hinst))
     return 0;
 
@@ -823,6 +971,7 @@ init_app (HINSTANCE hinst, int passed_cmdshow, int &ole_initialized)
   POINT point;
   SIZE size;
   int cmdshow = environ::load_geometry (passed_cmdshow, &point, &size);
+  g_initial_size = size;
   int restore_maximized = 0;
   if (sw_minimized_p (passed_cmdshow))
     {
@@ -842,11 +991,12 @@ init_app (HINSTANCE hinst, int passed_cmdshow, int &ole_initialized)
 
   ole_initialized = SUCCEEDED (OleInitialize (0));
 
-  app.toplev = CreateWindow (Application::ToplevelClassName, TitleBarString,
+  active_app_frame().toplev = CreateWindow (Application::ToplevelClassName, TitleBarString,
                              WS_OVERLAPPEDWINDOW,
                              point.x, point.y, size.cx, size.cy,
-                             HWND_DESKTOP, 0, hinst, 0);
-  if (!app.toplev)
+                             HWND_DESKTOP, 0, hinst, &active_app_frame());
+
+  if (!active_app_frame().toplev)
     return 0;
 
   mouse_state::install_hook ();
@@ -856,7 +1006,7 @@ init_app (HINSTANCE hinst, int passed_cmdshow, int &ole_initialized)
 
   WINDOWPLACEMENT wp;
   wp.length = sizeof wp;
-  GetWindowPlacement (app.toplev, &wp);
+  GetWindowPlacement (active_app_frame().toplev, &wp);
 
   if (point.x != CW_USEDEFAULT)
     {
@@ -877,10 +1027,10 @@ init_app (HINSTANCE hinst, int passed_cmdshow, int &ole_initialized)
       wp.flags = 0;
       wp.showCmd = cmdshow;
     }
-  SetWindowPlacement (app.toplev, &wp);
+  SetWindowPlacement (active_app_frame().toplev, &wp);
 
   if (point.x != CW_USEDEFAULT && show_normal)
-    SetWindowPos (app.toplev, 0, 0, 0,
+    SetWindowPos (active_app_frame().toplev, 0, 0, 0,
                   wp.rcNormalPosition.right - wp.rcNormalPosition.left,
                   wp.rcNormalPosition.bottom - wp.rcNormalPosition.top,
                   SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER);
@@ -889,44 +1039,164 @@ init_app (HINSTANCE hinst, int passed_cmdshow, int &ole_initialized)
   if (size.cx != CW_USEDEFAULT && show_normal)
     {
       RECT r;
-      GetClientRect (app.toplev, &r);
+      GetClientRect (active_app_frame().toplev, &r);
       AdjustWindowRect (&r, WS_OVERLAPPEDWINDOW, 0);
       int aw = r.right - r.left, ah = r.bottom - r.top;
-      GetWindowRect (app.toplev, &r);
+      GetWindowRect (active_app_frame().toplev, &r);
       int ww = r.right - r.left, wh = r.bottom - r.top;
       ww = min (ww, aw);
       wh = min (wh, ah);
-      SetWindowPos (app.toplev, 0, 0, 0, ww, wh,
+      SetWindowPos (active_app_frame().toplev, 0, 0, 0, ww, wh,
                     SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER);
     }
 #endif /* WINDOWBLINDS_FIXED */
 
-  if (!start_quit_thread ())
+  if (!start_quit_thread (&active_app_frame()))
     return 0;
 
   Fbegin_wait_cursor ();
 
-  ShowWindow (app.toplev, cmdshow);
+  ShowWindow (active_app_frame().toplev, cmdshow);
   if (sysdep.Win5p ())
-    UpdateWindow (app.toplev);
+    UpdateWindow (active_app_frame().toplev);
 
-  app.modeline_param.init (HFONT (SendMessage (app.hwnd_sw, WM_GETFONT, 0, 0)));
+  active_app_frame().modeline_param.init (HFONT (SendMessage (active_app_frame().hwnd_sw, WM_GETFONT, 0, 0)));
 
-  if (!init_editor_objects ())
+  if (!init_editor_objects (&active_app_frame(), NULL))
     return 0;
 
   try {Dde::initialize ();} catch (Dde::Exception &) {}
+  SetEvent (g_app.startupEvent);
 
   return 1;
 }
 
+static void
+call_startup(ApplicationFrame *app1, ApplicationFrame *parent)
+{
+	if (xsymbol_function (Vstartup_frame) == Qunbound
+		|| xsymbol_function (Vstartup_frame) == Qnil)
+    return;
+
+  suppress_gc sgc;
+  try
+    {
+		funcall_2 (Vstartup_frame, app1->lfp, parent->lfp);
+    }
+  catch (nonlocal_jump &)
+    {
+    	print_condition (nonlocal_jump::data());
+    }
+}
+
+extern void begin_wait_cursor (ApplicationFrame *app1);
+
+
+int
+init_app(HINSTANCE hinst, ApplicationFrame* app1, ApplicationFrame* parent)
+{
+  app1->toplev = 0;
+  app1->hinst = hinst;
+
+  app1->lfp = make_appframe();
+
+  LONG cx = g_initial_size.cx;
+  LONG cy = g_initial_size.cy;
+  long tmp;
+  if(safe_fixnum_value(xsymbol_value(Vframe_init_width), &tmp))
+	  cx = tmp;
+  if(safe_fixnum_value(xsymbol_value(Vframe_init_height), &tmp))
+	  cy = tmp;
+
+  cx = std::max(cx, 20L);
+  cy = std::max(cy, 20L);
+
+  app1->toplev = CreateWindow (Application::ToplevelClassName, TitleBarString,
+                             WS_OVERLAPPEDWINDOW,
+							 CW_USEDEFAULT, CW_USEDEFAULT, cx, cy,
+                             HWND_DESKTOP, 0, hinst, app1);
+
+  if (!app1->toplev)
+    return 0;
+
+  xappframe_fp (app1->lfp) = app1;
+
+  begin_wait_cursor (app1);
+
+  ShowWindow(app1->toplev, SW_SHOW);
+
+  if (sysdep.Win5p ())
+    UpdateWindow (app1->toplev);
+
+  app1->modeline_param.init (HFONT (SendMessage (app1->hwnd_sw, WM_GETFONT, 0, 0)));
+
+  if (!init_editor_objects (app1, selected_buffer(parent)))
+    return 0;
+
+  call_startup(app1, parent);
+
+  return 1;
+}
+
+static bool
+DirExists(LPCTSTR fullPath)
+{
+	DWORD res = GetFileAttributes(fullPath);
+	return res != -1 && (res & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+
+static bool
+ExistsNewFolder()
+{
+	TCHAR path[MAX_PATH];
+	ResolveModuleRelativeDir(path, MAX_PATH, "xyzzy_new");
+	return DirExists(path);
+}
+
+#include <string>
+using std::string;
+
+bool
+LaunchUpdater()
+{
+	DWORD pid = GetCurrentProcessId();
+	char exepath[MAX_PATH];
+	ResolveModuleRelativePath(exepath, MAX_PATH, NULL, "updater.exe");
+	string cmdline(exepath);
+	cmdline += " ";
+	char buf[256];
+	_itoa_s(pid, buf, 10);
+	cmdline += buf;
+
+	PROCESS_INFORMATION pi;
+	STARTUPINFO si;
+	memset (&si, 0, sizeof si);
+	si.cb = sizeof si;
+	if (!CreateProcess (0, (LPSTR)cmdline.c_str(), 0, 0, 0, CREATE_NEW_PROCESS_GROUP, 0, 0, &si, &pi))
+		return false;
+	CloseHandle (pi.hProcess);
+	CloseHandle (pi.hThread);
+
+	return true;
+}
+
+
 int PASCAL
 WinMain (HINSTANCE hinst, HINSTANCE, LPSTR, int cmdshow)
 {
+  if (ExistsNewFolder())
+  {
+	  if(LaunchUpdater())
+		  return 0;
+	  MessageBox(NULL, "Fail to launch updater", "Error", MB_ICONERROR);
+	  return 1;
+  }
+
   int ole_initialized = 0;
-  if (init_app (hinst, cmdshow, ole_initialized))
+  if (init_root_app (hinst, cmdshow, ole_initialized))
     {
-      xyzzy_instance xi (app.toplev);
+      xyzzy_instance xi (active_app_frame().toplev);
 
       MSG msg;
       while (PeekMessage (&msg, 0, 0, 0, PM_REMOVE))
@@ -954,7 +1224,7 @@ WinMain (HINSTANCE hinst, HINSTANCE, LPSTR, int cmdshow)
               start_listen_server ();
               Fset_cursor (xsymbol_value (Vcursor_shape));
               end_wait_cursor (1);
-              app.kbdq.init_kbd_encoding ();
+              active_app_frame().kbdq.init_kbd_encoding ();
 
               while (1)
                 {
@@ -968,7 +1238,7 @@ WinMain (HINSTANCE hinst, HINSTANCE, LPSTR, int cmdshow)
                     }
                 }
             }
-          app.kbdq.gime.disable ();
+          active_app_frame().kbdq.gime.disable ();
           cleanup_lisp_objects ();
           terminate_normally = 1;
         }
@@ -988,10 +1258,10 @@ WinMain (HINSTANCE hinst, HINSTANCE, LPSTR, int cmdshow)
 
   mouse_state::remove_hook ();
 
-  if (app.toplev)
+  if (active_app_frame().toplev)
     {
       end_listen_server ();
-      DestroyWindow (app.toplev);
+      DestroyWindow (active_app_frame().toplev);
     }
 
   if (ole_initialized)
@@ -1006,18 +1276,21 @@ WinMain (HINSTANCE hinst, HINSTANCE, LPSTR, int cmdshow)
         b_next = bp->b_next;
         delete bp;
       }
-    for (Window *wp = app.active_frame.windows, *w_next; wp; wp = w_next)
-      {
-        w_next = wp->w_next;
-        delete wp;
-      }
+	for (ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next)
+	{
+		for (Window *wp = app1->active_frame.windows, *w_next; wp; wp = w_next)
+		  {
+			w_next = wp->w_next;
+			delete wp;
+		  }
+	}
 
-    g_frame.cleanup ();
+    // active_main_frame().cleanup ();
 
     fflush (stdout);
     fflush (stderr);
     _CrtSetDbgFlag (_CrtSetDbgFlag (_CRTDBG_REPORT_FLAG) | _CRTDBG_LEAK_CHECK_DF);
   }
 #endif
-  return app.exit_code;
+  return g_app.exit_code;
 }

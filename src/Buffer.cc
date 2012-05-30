@@ -5,6 +5,8 @@
 #include "binfo.h"
 #include "buffer-bar.h"
 #include "version.h"
+#include "environ.h"
+#include <map>
 
 fixed_heap Chunk::c_heap (sizeof (Char) * TEXT_SIZE);
 fixed_heap Chunk::c_breaks_heap (BREAKS_SIZE);
@@ -13,18 +15,19 @@ Buffer *Buffer::b_dlist;
 Buffer *Buffer::b_last_selected_buffer;
 
 long Buffer::b_total_create_count;
-Buffer *Buffer::b_last_title_bar_buffer;
-int Buffer::b_title_bar_text_order;
+std::map<ApplicationFrame*, int> Buffer::b_title_bar_text_order_map;
+std::map<ApplicationFrame*, Buffer*> Buffer::b_last_title_bar_buffer_map;
 int Buffer::b_default_fold_mode = FOLD_NONE;
 int Buffer::b_default_linenum_mode = LNMODE_DISP;
 int Buffer::b_default_kinsoku_mode = KINSOKU_MODE_MASK;
 int Buffer::b_default_kinsoku_extend_limit = 3;
 int Buffer::b_default_kinsoku_shorten_limit = 10;
-u_char Buffer::b_buffer_bar_modified_any;
+int Buffer::b_last_modified_version_number = 1;
 
 fixed_heap ChunkHeap::a_heap (8192);
 fixed_heap textprop_heap::a_heap (4096);
 const u_char Chunk::c_breaks_mask[] = {1, 2, 4, 8, 16, 32, 64, 128};
+const u_char ChunkFoldInfo::c_breaks_mask[] = {1, 2, 4, 8, 16, 32, 64, 128};
 
 class enum_buffer
 {
@@ -51,16 +54,53 @@ public:
 
 enum_buffer *enum_buffer::eb_root;
 
+bool Chunk::fold_info_exist(int fold_columns) const
+{
+	if(!c_fold_map)
+		return false;
+    std::map<int, ChunkFoldInfo> *tmp = (std::map<int, ChunkFoldInfo> *)c_fold_map;
+	return (tmp->find(fold_columns) != tmp->end());
+}
+void Chunk::ensure_fold_info(int fold_columns)
+{
+	if(!fold_info_exist(fold_columns))
+	{
+		if(!c_fold_map)
+		{
+			c_fold_map = (void*) new std::map<int, ChunkFoldInfo>();
+		}
+		ChunkFoldInfo info;
+        std::map<int, ChunkFoldInfo> *tmp = (std::map<int, ChunkFoldInfo> *)c_fold_map;
+		(*tmp)[fold_columns] = info;
+	}
+}
+ChunkFoldInfo& Chunk::find_fold_info(int fold_columns) const {    
+	std::map<int, ChunkFoldInfo> *tmp = (std::map<int, ChunkFoldInfo> *)c_fold_map;
+	return (*tmp)[fold_columns];
+}
+
+void
+Chunk::invalidate_fold_info() {
+  if(c_fold_map)
+  {
+    std::map<int, ChunkFoldInfo> *tmp = (std::map<int, ChunkFoldInfo> *)c_fold_map;
+    delete tmp;
+    c_fold_map = 0;
+  }
+  c_default_nbreaks = -1;
+}
+
+
 void
 Chunk::clear ()
 {
   c_used = 0;
   c_nlines = 0;
-  c_nbreaks = 0;
-  bzero (c_breaks, BREAKS_SIZE);
-  c_first_eol = -1;
-  c_last_eol = -1;
+
   c_bstate = syntax_state::SS_INVALID;
+
+  invalidate_fold_info();
+  c_default_nbreaks = 0;
 }
 
 Chunk *
@@ -72,18 +112,16 @@ Buffer::alloc_chunk ()
   cp->c_prev = 0;
   cp->c_next = 0;
   cp->c_used = 0;
+  cp->c_fold_map = 0;
   cp->c_nlines = -1;
-  cp->c_nbreaks = -1;
-  cp->c_first_eol = -1;
-  cp->c_last_eol = -1;
+  cp->c_default_nbreaks = -1;
   cp->c_bstate = syntax_state::SS_INVALID;
   cp->c_text = (Char *)Chunk::c_heap.alloc ();
   if (cp->c_text)
     {
-      cp->c_breaks = (u_char *)Chunk::c_breaks_heap.alloc ();
-      if (cp->c_breaks)
-        return cp;
-      Chunk::c_heap.free (cp->c_text);
+	  // we lazily allocate fold related information.
+	  // it might cause memory shortage crash, but these days it's quite rare anymore.
+      return cp;
     }
   b_chunk_heap.free (cp);
   return 0;
@@ -95,8 +133,8 @@ Buffer::free_chunk (Chunk *cp)
   assert (cp);
   if (cp->c_text)
     Chunk::c_heap.free (cp->c_text);
-  if (cp->c_breaks)
-    Chunk::c_breaks_heap.free (cp->c_breaks);
+  cp->invalidate_fold_info();
+
   b_chunk_heap.free (cp);
 }
 
@@ -116,10 +154,13 @@ Buffer::Buffer (lisp name, lisp filename, lisp dirname, int temporary)
   b_prev = b_next = 0;
   b_ldisp = 0;
 
-  b_tab_columns = app.default_tab_columns;
+  b_tab_columns = g_app.default_tab_columns;
   b_local_tab_columns = 0;
 
   lbp = temporary ? Qnil : make_buffer ();
+
+  fold_map = (void*)new std::map<const Window*, int>();
+  nfolded_map = (void*)new std::map<int, long>();
 
   b_chunkb = alloc_chunk ();
   if (!b_chunkb)
@@ -127,7 +168,7 @@ Buffer::Buffer (lisp name, lisp filename, lisp dirname, int temporary)
   b_chunke = b_chunkb;
   b_nchars = 0;
   b_nlines = 1;
-  b_nfolded = 1;
+  b_default_nfolded = 1;
 
   b_textprop = 0;
   b_textprop_cache = 0;
@@ -170,7 +211,7 @@ Buffer::Buffer (lisp name, lisp filename, lisp dirname, int temporary)
   b_done_auto_save = 0;
   b_make_backup = 0;
   b_buffer_name_modified = 1;
-  b_buffer_bar_modified = 0;
+  b_modified_version = ++Buffer::b_last_modified_version_number;
   b_buffer_bar_fg = COLORREF (-1);
   b_buffer_bar_bg = COLORREF (-1);
 
@@ -223,6 +264,7 @@ Buffer::Buffer (lisp name, lisp filename, lisp dirname, int temporary)
 
   b_fold_mode = FOLD_DEFAULT;
   b_fold_columns = Buffer::FOLD_NONE;
+
   init_fold_width (b_default_fold_mode);
 
   b_hjump_columns = -1;
@@ -277,7 +319,7 @@ Buffer::erase ()
 
   b_nchars = 0;
   b_nlines = 1;
-  b_nfolded = 1;
+  set_nfolded_all(1);
 
   b_contents.p1 = 0;
   b_contents.p2 = 0;
@@ -336,13 +378,16 @@ Buffer::erase ()
     if (xmarker_point (xcar (x)) != NO_MARK_SET)
       xmarker_point (xcar (x)) = 0;
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    if (wp->w_bufp == this)
-      {
-        wp->w_last_bufp = 0;
-        wp->w_bufp = 0;
-        wp->set_buffer (this);
-      }
+  for (ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next)
+  {
+	  for (Window *wp = app1->active_frame.windows; wp; wp = wp->w_next)
+		if (wp->w_bufp == this)
+		  {
+			wp->w_last_bufp = 0;
+			wp->w_bufp = 0;
+			wp->set_buffer (this);
+		  }
+  }
 
   for (WindowConfiguration *wc = WindowConfiguration::wc_chain; wc; wc = wc->wc_prev)
     for (int i = 0; i < wc->wc_nwindows; i++)
@@ -396,6 +441,81 @@ Buffer::~Buffer ()
   delete_contents ();
   if (bufferp (lbp))
     xbuffer_bp (lbp) = 0;
+
+  std::map<const Window*, int> *tmp = (std::map<const Window*, int> *)fold_map;
+  delete tmp;
+  fold_map = 0;
+  
+  std::map<int, long> *tmp2 = (std::map<int, long> *)nfolded_map;
+  delete tmp2;
+  nfolded_map = 0;
+}
+
+int Buffer::get_fold_columns(const Window* win) const 
+{
+  if(b_fold_columns != FOLD_WINDOW)
+	return b_fold_columns;
+
+  if(!fold_columns_exist(win))
+  {
+    return Buffer::FOLD_NONE;
+  }
+
+  std::map<const Window*, int> *tmp = (std::map<const Window*, int> *)fold_map;
+  return (*tmp)[win];
+}
+
+bool Buffer::fold_columns_exist(const Window* win) const 
+{
+  std::map<const Window*, int> *tmp = (std::map<const Window*, int> *)fold_map;
+  return tmp->find(win) != tmp->end();
+}
+
+bool Buffer::nfolded_exist(int fold_columns) const 
+{
+  std::map<int, long> *tmp = (std::map<int, long> *)nfolded_map;
+  return tmp->find(fold_columns) != tmp->end();
+}
+
+
+int Buffer::get_first_fold_columns() const 
+{
+  std::map<const Window*, int> *tmp = (std::map<const Window*, int> *)fold_map;
+  std::map<const Window*, int>::iterator itr = tmp->begin();
+  if(itr != tmp->end())
+	  return itr->second;
+
+  return Buffer::FOLD_NONE;
+}
+
+void Buffer::set_fold_columns(Window* win, int column) 
+{
+  std::map<const Window*, int> *tmp = (std::map<const Window*, int> *)fold_map;
+  (*tmp)[win] = column;
+}
+
+long Buffer::get_nfolded(int fold_columns) const
+{
+  std::map<int, long> *tmp = (std::map<int, long> *)nfolded_map;
+  if(!nfolded_exist(fold_columns))
+  {
+	  return b_default_nfolded;
+  }
+  return (*tmp)[fold_columns];
+}
+
+
+void Buffer::set_nfolded(int fold_columns, long nfolded)
+{
+  std::map<int, long> *tmp = (std::map<int, long> *)nfolded_map;
+  (*tmp)[fold_columns] = nfolded;
+}
+
+void Buffer::set_nfolded_all(long nfolded)
+{
+  std::map<int, long> *tmp = (std::map<int, long> *)nfolded_map;
+  tmp->clear();
+  b_default_nfolded = nfolded;
 }
 
 void
@@ -593,10 +713,12 @@ Fcreate_new_buffer (lisp buffer_name)
   return Buffer::create_buffer (buffer_name, Qnil, Qnil)->lbp;
 }
 
+
 lisp
-Fselected_buffer ()
+Fselected_buffer (lisp lframe)
 {
-  return selected_buffer ()->lbp;
+  ApplicationFrame *frame = ApplicationFrame::coerce_to_frame(lframe);
+  return selected_buffer (frame)->lbp;
 }
 
 lisp
@@ -736,7 +858,8 @@ Buffer::quoted_buffer_name (char *b, char *be, int qc, int qe) const
 void
 Buffer::modify_mode_line () const
 {
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  all_window_iterator itr;
+  for (Window *wp = itr.begin(); wp; wp = itr.next())
     if (wp->w_bufp == this)
       wp->w_disp_flags |= Window::WDF_MODELINE;
 }
@@ -864,13 +987,14 @@ in_pseudo_frame_p (Buffer *bp)
 Buffer *
 Buffer::dlist_find ()
 {
-  for (Buffer *bp = b_dlist; bp; bp = bp->b_ldisp)
+  Buffer *bp;
+  for (bp = b_dlist; bp; bp = bp->b_ldisp)
     if (Fget_buffer_window (bp->lbp, Qnil) == Qnil
         && !in_pseudo_frame_p (bp))
       return bp;
   if (b_dlist && b_dlist->b_ldisp)
     return b_dlist->b_ldisp;
-  Buffer *bp = selected_buffer ();
+  bp = selected_buffer ();
   if (!bp->internal_buffer_p ())
     return bp;
   return bp->next_buffer (0);
@@ -895,8 +1019,11 @@ Fdelete_buffer (lisp buffer)
   if (bp->run_hook_while_success (Vdelete_buffer_hook, bp->lbp) == Qnil)
     return Qnil;
 
-  if (bp == Buffer::b_last_title_bar_buffer)
-    Buffer::b_last_title_bar_buffer = 0;
+  for(ApplicationFrame *app = first_app_frame(); app; app = app->a_next)
+  {
+	  if (bp == Buffer::b_last_title_bar_buffer_map[app])
+		Buffer::b_last_title_bar_buffer_map[app] = 0;
+  }
 
   bp->dlist_add_tail ();
   Buffer *newbp = Buffer::dlist_find ();
@@ -917,13 +1044,16 @@ Fdelete_buffer (lisp buffer)
       return Qnil;
     }
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    if (wp->w_bufp == bp)
-      {
-        wp->w_last_bufp = 0;
-        wp->w_bufp = 0;
-        wp->set_buffer (newbp);
-      }
+  for(ApplicationFrame *app = first_app_frame(); app; app = app->a_next)
+  {
+	  for (Window *wp = app->active_frame.windows; wp; wp = wp->w_next)
+		if (wp->w_bufp == bp)
+		  {
+			wp->w_last_bufp = 0;
+			wp->w_bufp = 0;
+			wp->set_buffer (newbp);
+		  }
+  }
 
   delete bp;
   return Qt;
@@ -1213,7 +1343,7 @@ call_hooks (lisp hook)
 int
 Buffer::query_kill_xyzzy ()
 {
-  if (app.kbdq.disablep ())
+  if (active_app_frame().kbdq.disablep ())
     return 0;
   if (!call_hooks (Vbefore_delete_buffer_hook))
     return 0;
@@ -1258,17 +1388,26 @@ Buffer::kill_xyzzy (int query)
   return 1;
 }
 
+extern bool is_last_app_frame();
+
+
 lisp
 Fkill_xyzzy (lisp lexit_code)
 {
-  if (!lexit_code)
+  if(!is_last_app_frame())
+  {
+    Fdelete_frame(active_app_frame().lfp, Qnil);
+    return Qnil;
+  }
+
+ if (!lexit_code)
     lexit_code = Qt;
   if (lexit_code == Qt)
-    app.exit_code = EXIT_SUCCESS;
+    g_app.exit_code = EXIT_SUCCESS;
   else if (lexit_code == Qnil)
-    app.exit_code = EXIT_FAILURE;
+    g_app.exit_code = EXIT_FAILURE;
   else
-    app.exit_code = fixnum_value (lexit_code);
+    g_app.exit_code = fixnum_value (lexit_code);
 
   if (Buffer::kill_xyzzy (1))
     {
@@ -1282,6 +1421,35 @@ Fkill_xyzzy (lisp lexit_code)
   return Qnil;
 }
 
+lisp
+Fprepare_for_kill_xyzzy ()
+{
+  environ::save_geometry ();
+  return Qt;
+}
+
+extern bool LaunchUpdater();
+lisp
+Frestart_for_update ()
+{
+  if(!LaunchUpdater())
+  {
+	  MessageBox(NULL, "Fail to launch updater.", "Error", MB_ICONERROR);
+	  return Qnil;
+  }
+  if (Buffer::kill_xyzzy (1))
+    {
+      nonlocal_data *nld = nonlocal_jump::data ();
+      nld->type = Qexit_this_level;
+      nld->value = Qnil;
+      nld->tag = Qnil;
+      nld->id = xsymbol_value (Vierror_silent_quit);
+      throw nonlocal_jump ();
+    }
+  return Qnil;
+}
+
+
 char *
 Buffer::store_title (lisp x, char *b, char *be) const
 {
@@ -1291,15 +1459,15 @@ Buffer::store_title (lisp x, char *b, char *be) const
 }
 
 void
-Buffer::refresh_title_bar () const
+Buffer::refresh_title_bar (ApplicationFrame *app) const
 {
   lisp fmt = symbol_value (Vtitle_bar_format, this);
   if (stringp (fmt))
     {
       char buf[512 + 10];
-      buffer_info binfo (0, this, 0, 0, 0);
+      buffer_info binfo (app, 0, this, 0, 0, 0);
       *binfo.format (fmt, buf, buf + 512) = 0;
-      SetWindowText (app.toplev, buf);
+      SetWindowText (app->toplev, buf);
     }
   else
     {
@@ -1318,34 +1486,51 @@ Buffer::refresh_title_bar () const
       else
         store_title (x, stpcpy (stpcpy (b, TitleBarString), " - "), b + l);
 
-      SetWindowText (app.toplev, b);
+      SetWindowText (app->toplev, b);
     }
-  b_last_title_bar_buffer = 0; // 次回タイトルバーを強制的に再描画させる
+  b_last_title_bar_buffer_map[app] = 0; // 次回タイトルバーを強制的に再描画させる
 }
 
 void
-Buffer::set_frame_title (int update)
+Buffer::set_frame_title (ApplicationFrame* app, int update)
 {
   int order = xsymbol_value (Vtitle_bar_text_order) != Qnil;
   if (!internal_buffer_p ()
       && (update
           || b_buffer_name_modified
-          || b_last_title_bar_buffer != this
-          || b_title_bar_text_order != order))
+          || b_last_title_bar_buffer_map[app] != this
+          || b_title_bar_text_order_map[app] != order))
     {
-      refresh_title_bar ();
+      refresh_title_bar (app);
       b_buffer_name_modified = 0;
-      b_last_title_bar_buffer = this;
-      b_title_bar_text_order = order;
+      b_last_title_bar_buffer_map[app] = this;
+      b_title_bar_text_order_map[app] = order;
+    }
+}
+
+void
+Buffer::remove_application_frame_cache (ApplicationFrame* app)
+{
+  if (b_title_bar_text_order_map.find (app) != b_title_bar_text_order_map.end ())
+    {
+      b_title_bar_text_order_map.erase (app);
+    }
+
+  if (b_last_title_bar_buffer_map.find (app) != b_last_title_bar_buffer_map.end ())
+    {
+      b_last_title_bar_buffer_map.erase (app);
     }
 }
 
 lisp
 Frefresh_title_bar ()
 {
-  Buffer *bp = selected_buffer ();
-  if (!bp->internal_buffer_p ())
-    bp->refresh_title_bar ();
+  for(ApplicationFrame *app = first_app_frame(); app; app = app->a_next)
+  {
+	Buffer *bp = selected_buffer (app);
+	if (!bp->internal_buffer_p ())
+		bp->refresh_title_bar (app);
+  }
   return Qt;
 }
 
@@ -1374,7 +1559,8 @@ Buffer::change_colors (const XCOLORREF *cc)
       b_colors_enable = 0;
     }
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  all_window_iterator itr;
+  for (Window *wp = itr.begin(); wp; wp = itr.next())
     if (wp->w_bufp == this)
       wp->change_color ();
 }
@@ -1445,12 +1631,16 @@ change_local_colors (const XCOLORREF *cc, int dir, int subdir)
     }
 }
 
+
 void
 Buffer::refresh_buffer () const
 {
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  all_window_iterator itr;
+  for (Window *wp = itr.begin(); wp; wp = itr.next())
+  {
     if (wp->w_bufp == this)
       wp->w_disp_flags |= Window::WDF_WINDOW;
+  }
 }
 
 void
@@ -1465,41 +1655,89 @@ Buffer::window_size_changed ()
 void
 Buffer::fold_width_modified ()
 {
-  b_nfolded = -1;
+  set_nfolded_all(-1);
   for (Chunk *cp = b_chunkb; cp; cp = cp->c_next)
-    cp->c_nbreaks = -1;
+	cp->invalidate_fold_info();
+}
+
+
+bool
+Buffer::init_fold_width_with_window(Window *win, int w)
+{
+  if (get_fold_columns(win) != w)
+  {
+	  set_fold_columns(win, w);
+	  return true;
+  }
+  return false;
+}
+
+static void
+set_fold_window(Buffer* buf)
+{
+  bool modified = false;
+  if(buf->b_fold_columns != Buffer::FOLD_WINDOW)
+  {
+	  buf->b_fold_columns = Buffer::FOLD_WINDOW;
+	  modified = true;
+  }
+
+  for(ApplicationFrame *app = first_app_frame(); app; app = app->a_next)
+  {
+	for (Window *wp = app->active_frame.windows; wp; wp = wp->w_next)
+	{
+	  if (wp->w_bufp == buf)
+	  {
+		int cx = wp->w_ech.cx;
+		if (wp->flags () & Window::WF_LINE_NUMBER)
+			cx -= Window::LINENUM_COLUMNS + 1;
+		if (wp->flags () & Window::WF_FOLD_MARK)
+			cx--;
+
+		if (cx < MIN_FOLD_WIDTH)
+          cx = MIN_FOLD_WIDTH;
+		else if (cx > MAX_FOLD_WIDTH)
+          cx = MAX_FOLD_WIDTH;
+		bool mod = buf->init_fold_width_with_window(wp, cx);
+		modified |= mod;
+
+	  }
+	}
+  }
+
+  if(modified)
+  {
+    buf->fold_width_modified ();
+    buf->refresh_buffer ();
+  }
+}
+
+// set fold width except for fold-window.
+static void
+set_fold_width_no_window(Buffer *buf, int w)
+{
+  if(buf->b_fold_columns != w)
+  {
+	buf->b_fold_columns = w;
+    buf->fold_width_modified ();
+    buf->refresh_buffer ();
+  }
 }
 
 void
 Buffer::init_fold_width (int w)
 {
+  bool modified = false;
   if (w == FOLD_WINDOW)
-    {
-      w = -1;
-      for (const Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-        if (wp->w_bufp == this)
-          {
-            int cx = wp->w_ech.cx;
-            if (wp->flags () & Window::WF_LINE_NUMBER)
-              cx -= Window::LINENUM_COLUMNS + 1;
-            if (wp->flags () & Window::WF_FOLD_MARK)
-              cx--;
-            w = max (w, cx);
-          }
-      if (w == -1)
-        return;
-      if (w < MIN_FOLD_WIDTH)
-        w = MIN_FOLD_WIDTH;
-      else if (w > MAX_FOLD_WIDTH)
-        w = MAX_FOLD_WIDTH;
-    }
-  if (b_fold_columns != w)
-    {
-      b_fold_columns = w;
-      fold_width_modified ();
-      refresh_buffer ();
-    }
+  {
+	 set_fold_window(this);
+  }
+  else
+  {
+	 set_fold_width_no_window(this, w);
+  }
 }
+
 
 static int
 fold_width (lisp width)
@@ -1573,12 +1811,14 @@ Fbuffer_fold_width (lisp buffer)
                       : bp->b_fold_mode);
 }
 
+// TODO: should be updated
 lisp
 Fbuffer_fold_column (lisp buffer)
 {
   Buffer *bp = Buffer::coerce_to_buffer (buffer);
-  return (bp->b_fold_columns == Buffer::FOLD_NONE
-          ? Qnil : make_fixnum (bp->b_fold_columns));
+  int fold_column = bp->get_first_fold_columns();
+  return (fold_column == Buffer::FOLD_NONE
+          ? Qnil : make_fixnum (fold_column));
 }
 
 lisp
@@ -1912,13 +2152,13 @@ Fset_kinsoku_shorten_limit (lisp lchars, lisp lbuffer)
 }
 
 void
-Buffer::change_ime_mode ()
+Buffer::change_ime_mode (ApplicationFrame* app)
 {
   if (b_last_selected_buffer != this)
     {
       b_last_selected_buffer = this;
       if (xsymbol_value (Vsave_buffer_ime_mode) != Qnil)
-        app.kbdq.toggle_ime (b_ime_mode);
+        app->kbdq.toggle_ime (b_ime_mode);
     }
 }
 
@@ -1950,7 +2190,7 @@ Fset_buffer_ime_mode (lisp f, lisp buffer)
   if (bp->b_ime_mode != omode
       && bp == selected_buffer ()
       && xsymbol_value (Vsave_buffer_ime_mode) != Qnil)
-    app.kbdq.toggle_ime (bp->b_ime_mode);
+    active_app_frame().kbdq.toggle_ime (bp->b_ime_mode);
   return Qt;
 }
 

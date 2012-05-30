@@ -1,6 +1,5 @@
-﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual C++ Express 2010
+# Visual Studio 2010
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dpp", "projects\dpp.vcxproj", "{A2C59236-6E41-487F-AB4A-E988D1C627D8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gen-char-width", "projects\gen-char-width.vcxproj", "{7558425F-6F8C-4BDC-9D85-40E18E7E3F95}"
@@ -26,6 +25,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xyzzycli", "projects\xyzzycli.vcxproj", "{983ABBC6-6781-45A3-BF4B-F1A6B6E733DA}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xyzzyenv", "projects\xyzzyenv.vcxproj", "{2C956011-ED51-4699-BAC1-B7687910AF1D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "updater", "updater\updater.vcxproj", "{2347D3DC-1731-4C3E-A535-7BA2F4942624}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -85,6 +86,10 @@ Global
 		{2C956011-ED51-4699-BAC1-B7687910AF1D}.Debug|Win32.Build.0 = Debug|Win32
 		{2C956011-ED51-4699-BAC1-B7687910AF1D}.Release|Win32.ActiveCfg = Release|Win32
 		{2C956011-ED51-4699-BAC1-B7687910AF1D}.Release|Win32.Build.0 = Release|Win32
+		{2347D3DC-1731-4C3E-A535-7BA2F4942624}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2347D3DC-1731-4C3E-A535-7BA2F4942624}.Debug|Win32.Build.0 = Debug|Win32
+		{2347D3DC-1731-4C3E-A535-7BA2F4942624}.Release|Win32.ActiveCfg = Release|Win32
+		{2347D3DC-1731-4C3E-A535-7BA2F4942624}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

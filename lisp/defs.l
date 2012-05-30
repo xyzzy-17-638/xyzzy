@@ -302,8 +302,9 @@
 (export 'compare-windows)
 (autoload 'compare-windows "comparew" t)
 
-(export 'version-up-xyzzy)
-(autoload 'version-up-xyzzy "verup" t)
+;; will be deleted in the near future (by mumurik765)
+;(export 'version-up-xyzzy)
+;(autoload 'version-up-xyzzy "verup" t)
 
 (export 'diff)
 (autoload 'diff "diff" t)
@@ -313,3 +314,6 @@
 
 (export 'show-dexplorer)
 (autoload 'show-dexplorer "dexplorer" t)
+
+(export 'check-update)
+(autoload 'check-update "ni/update-xyzzy" t)

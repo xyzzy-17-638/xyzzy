@@ -107,7 +107,8 @@ lisp
 Fchar_not_eql (lisp args)
 {
   int nargs = 0;
-  for (lisp p = args; consp (p); p = xcdr (p), nargs++)
+  lisp p;
+  for (p = args; consp (p); p = xcdr (p), nargs++)
     {
       check_char (xcar (p));
       QUIT;
@@ -220,7 +221,8 @@ lisp
 Fchar_not_equal (lisp args)
 {
   int nargs = 0;
-  for (lisp p = args; consp (p); p = xcdr (p), nargs++)
+  lisp p;
+  for (p = args; consp (p); p = xcdr (p), nargs++)
     {
       check_char (xcar (p));
       QUIT;

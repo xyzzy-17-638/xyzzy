@@ -115,8 +115,8 @@
 			     (list (list (pseudo-frame-name frame)
 					 (winconf-to-readable-winconf
 					  (pseudo-frame-winconf frame))
-					 (eq frame *current-pseudo-frame*)))))
-		       *pseudo-frame-list*))
+					 (eq frame (get-current-pseudo-frame (selected-frame)))))))
+		       (get-pseudo-frame-list (selected-frame))))
 	(binfo (list-buffer-info)))
     (princ ";;; xyzzy session file.
 ;;; This file is generated automatically. do not edit.\n" s)
@@ -157,15 +157,15 @@
   (let ((current nil))
     (mapc #'(lambda (info)
 	      (let ((frame (or (find-pseudo-frame (car info))
-			       (create-pseudo-frame-1 (car info) t))))
+			       (create-pseudo-frame-1 (selected-frame) (car info) t))))
 		(setf (pseudo-frame-winconf frame)
 		      (readable-winconf-to-winconf (cadr info)))
 		(when (caddr info)
 		  (setq current frame))))
 	  finfo)
     (when current
-      (setq *current-pseudo-frame* nil)
-      (select-pseudo-frame current))))
+      (set-current-pseudo-frame (selected-frame) nil)
+      (select-pseudo-frame current (selected-frame)))))
 
 (defun close-session (&optional noask (create-new t) (fn #'write-file))
   (interactive "p")
@@ -251,8 +251,8 @@
 (add-hook '*save-history-hook* #'auto-save-session-file)
 
 (defun add-session-history-to-menu ()
-  (when (menup *app-menu*)
-    (add-lru-menu *recent-session-popup-menu*
+  (when (menup (get-app-menu (selected-frame)))
+    (add-lru-menu (get-recent-session-popup-menu (selected-frame))
 		  *session-file-history*
 		  #'(lambda (filename)
 		      #'(lambda ()

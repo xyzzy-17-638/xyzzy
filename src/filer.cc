@@ -315,7 +315,8 @@ FilerView::add_list_view (const char *last)
   ListView_DeleteAllItems (fv_hwnd);
 
   int nfiles = 0;
-  for (find_chunk *fc = fv_chunk; fc; fc = fc->fc_cdr)
+  find_chunk *fc ;
+  for (fc = fv_chunk; fc; fc = fc->fc_cdr)
     nfiles += fc->fc_used;
 
   ListView_SetItemCount (fv_hwnd, nfiles);
@@ -408,7 +409,7 @@ FilerView::init_view (HWND hwnd, HWND hwnd_mask, HWND hwnd_marks,
   fv_directory_index = -(filer_data::ICON_DIRECTORY + 1);
   if (!fv_retrieve_icon)
     {
-      HIMAGELIST hil = ImageList_LoadBitmap (app.hinst,
+      HIMAGELIST hil = ImageList_LoadBitmap (active_app_frame().hinst,
                                              MAKEINTRESOURCE (IDB_FILESEL),
                                              16, 1, RGB (0, 0, 255));
       ListView_SetImageList (fv_hwnd, hil, LVSIL_SMALL);
@@ -424,7 +425,7 @@ FilerView::init_view (HWND hwnd, HWND hwnd_mask, HWND hwnd_marks,
       if (SHGetFileInfo ("", FILE_ATTRIBUTE_DIRECTORY, &fi, sizeof fi, flags))
         fv_directory_index = fi.iIcon;
       ListView_SetImageList (fv_hwnd, hil, LVSIL_SMALL);
-      hil = ImageList_LoadBitmap (app.hinst,
+      hil = ImageList_LoadBitmap (active_app_frame().hinst,
                                   MAKEINTRESOURCE (IDB_FILESEL),
                                   16, 1, RGB (0, 0, 255));
       ListView_SetSubImageList (fv_hwnd, hil, 0);
@@ -1260,16 +1261,16 @@ void
 FilerView::echo_filename ()
 {
   if (xsymbol_value (Vfiler_echo_filename) == Qnil)
-    app.status_window.clear ();
+    active_app_frame().status_window.clear ();
   else if (fv_parent->check_idle ())
     {
       LV_ITEM lvi;
       if (find_focused (&lvi) >= 0)
         {
           const filer_data *f = (filer_data *)lvi.lParam;
-          app.status_window.text (*f->name ? f->name : "..");
+          active_app_frame().status_window.text (*f->name ? f->name : "..");
         }
-      app.status_window.clear (1);
+      active_app_frame().status_window.clear (1);
     }
 }
 
@@ -1597,7 +1598,7 @@ Filer::InitDialog ()
 {
   set_idle (0);
 
-  HICON ico = LoadIcon (app.hinst,
+  HICON ico = LoadIcon (active_app_frame().hinst,
                         (modeless_p ()
                          ? MAKEINTRESOURCE (IDI_FILER)
                          : MAKEINTRESOURCE (IDI_XYZZY)));
@@ -1726,7 +1727,7 @@ Filer::dispatch (lChar cc)
   f_lkeymap = Qunbound;
   if (fn == Qnil)
     {
-      app.status_window.puts (Ekey_not_bound, 1);
+      active_app_frame().status_window.puts (Ekey_not_bound, 1);
       return 0;
     }
 
@@ -2219,8 +2220,8 @@ Filer::WndProc (UINT msg, WPARAM wparam, LPARAM lparam)
       if (dual_window_p ())
         f_fv2.save_column ();
       save_geometry ();
-      if (IsWindowEnabled (app.toplev))
-        SetActiveWindow (app.toplev);
+      if (IsWindowEnabled (active_app_frame().toplev))
+        SetActiveWindow (active_app_frame().toplev);
       return 1;
 
     case WM_NCDESTROY:
@@ -2250,13 +2251,13 @@ Filer::WndProc (UINT msg, WPARAM wparam, LPARAM lparam)
       if (LOWORD (wparam) != WA_INACTIVE)
         {
           f_mlactive = f_mlfiler == this;
-          app.status_window.set (f_hwnd_status);
+          active_app_frame().status_window.set (f_hwnd_status);
           f_pview->echo_filename ();
         }
       return 0;
 
     case WM_ACTIVATEAPP:
-      PostThreadMessage (app.quit_thread_id, WM_PRIVATE_ACTIVATEAPP,
+      PostThreadMessage (g_app.quit_thread_id, WM_PRIVATE_ACTIVATEAPP,
                          wparam, lparam);
       return 0;
 
@@ -2317,7 +2318,7 @@ Filer::WndProc (UINT msg, WPARAM wparam, LPARAM lparam)
     case WM_DRAWITEM:
       if (f_ctx_menu2 && ((DRAWITEMSTRUCT *)lparam)->CtlType == ODT_MENU)
         return f_ctx_menu2->HandleMenuMsg (msg, wparam, lparam) == NOERROR;
-      return app.status_window.paint ((DRAWITEMSTRUCT *)lparam);
+      return active_app_frame().status_window.paint ((DRAWITEMSTRUCT *)lparam);
 
     default:
       return 0;
@@ -2503,10 +2504,10 @@ Filer::read_char () const
           return decode_syschars (msg.wParam);
 
         case WM_PRIVATE_QUIT:
-          if (msg.hwnd == app.toplev && GetActiveWindow () == id_hwnd)
+          if (msg.hwnd == active_app_frame().toplev && GetActiveWindow () == id_hwnd)
             {
               xsymbol_value (Vquit_flag) = Qnil;
-              return xchar_code (app.lquit_char);
+              return xchar_code (active_app_frame().lquit_char);
             }
           DispatchMessage (&msg);
           QUIT;
@@ -2985,7 +2986,7 @@ vw_wndproc (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 }
 
 ViewerWindow::ViewerWindow ()
-     : Window (0, 1)
+: Window (&active_app_frame(),  0, 1)
 {
   w_hwnd = 0;
   w_hwnd_ml = 0;
@@ -3002,7 +3003,7 @@ ViewerWindow::ViewerWindow ()
       wc.lpfnWndProc = vw_wndproc;
       wc.cbClsExtra = 0;
       wc.cbWndExtra = sizeof (ViewerWindow *);
-      wc.hInstance = app.hinst;
+      wc.hInstance = active_app_frame().hinst;
       wc.hIcon = 0;
       wc.hCursor = sysdep.hcur_arrow;
       wc.hbrBackground = 0;
@@ -3023,13 +3024,14 @@ int
 ViewerWindow::init (HWND parent, ViewerBuffer *bp)
 {
   w_bufp = bp;
+  bp->set_fold_columns(this, 80);
   w_point.p_point = 0;
   w_point.p_chunk = bp->b_chunkb;
   w_point.p_offset = 0;
   return (int)CreateWindowEx (sysdep.Win4p () ? WS_EX_CLIENTEDGE : 0,
                               vw_classname, "",
                               WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
-                              0, 0, 0, 0, parent, 0, app.hinst, this);
+                              0, 0, 0, 0, parent, 0, active_app_frame().hinst, this);
 }
 
 void
@@ -3045,8 +3047,9 @@ ViewerWindow::resize (int x, int y, int w, int h)
 ViewerBuffer::ViewerBuffer ()
      : Buffer (Qnil, Qnil, Qnil, 1)
 {
-  b_fold_columns = 80;
-  b_nfolded = -1;
+  // set at init now.
+  // b_fold_columns = 80;
+  set_nfolded_all(-1);
 }
 
 void
@@ -3220,7 +3223,7 @@ Fget_filer_font ()
 
   LOGFONT lf = filer_font.logfont ();
   int size = lf.lfHeight;
-  BOOL size_pixel_p = app.text_font.size_pixel_p ();
+  BOOL size_pixel_p = active_app_frame().text_font.size_pixel_p ();
   if (!size_pixel_p)
     size = FontObject::pixel_to_point (size);
 

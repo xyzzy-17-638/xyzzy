@@ -246,7 +246,8 @@ topic_list_callback (DdeCallbackInfo *dci)
     return 0;
 
   int nbytes = 0;
-  for (DdeTopicList *t = DdeServerTopicList; t->topic; t++)
+  DdeTopicList *t;
+  for (t = DdeServerTopicList; t->topic; t++)
     nbytes += strlen (t->topic) + 1;
 
   HDDEDATA hdata = DdeCreateDataHandle (Dde::instance (), 0, 0, nbytes,
@@ -285,7 +286,8 @@ item_list_callback (DdeCallbackInfo *dci)
     return HDDEDATA (dci->type == XTYP_REQUEST ? DDE_FNOTPROCESSED : 0);
 
   int nbytes = 0;
-  for (DdeItemList *il = t->items; il->item; il++)
+  DdeItemList *il;
+  for (il = t->items; il->item; il++)
     if (il->item != DDE_EXECUTE_ITEM)
       nbytes += strlen (il->item) + 1;
 

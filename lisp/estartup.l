@@ -8,6 +8,7 @@
 (in-package "editor")
 
 (export '(*inhibit-history-load* *pre-startup-hook* *post-startup-hook*
+	  *after-make-frame-functions*
 	  *command-line-mailto-hook* *print-option-show-dialog*
 	  *process-command-line-hook* *loading-user-initial-file*
 	  *command-line-args-base-directory*
@@ -39,6 +40,7 @@
 
 (defun process-command-line-1 (dir waitobj)
   (let ((mode nil)
+	(wow64-redirection *parent-process-wow64-p*)
 	(ro nil)
 	(*command-line-args-base-directory* dir))
     (catch 'warn
@@ -95,10 +97,14 @@
 		 (setq ro t))
 		((equal "-rw" arg)
 		 (setq ro nil))
+		((equal "-wow64-redirection" arg)
+		 (setq wow64-redirection t))
+		((equal "-no-wow64-redirection" arg)
+		 (setq wow64-redirection nil))
 		((run-hook-with-args-until-success
 		  '*process-command-line-hook* arg))
 		(t
-		 (let* ((filename (merge-pathnames arg dir))
+		 (let* ((filename (si:wow64-reinterpret-path (merge-pathnames arg dir) wow64-redirection))
 			(*find-file-auto-mode-function* mode))
 		   (if ro
 		       (find-file-read-only filename)
@@ -109,6 +115,13 @@
 
 (defun process-command-line ()
   (process-command-line-1 (cwd) nil))
+
+(defun consume-args (args name action)
+  (if (find name args :test #'equal)
+      (progn
+        (funcall action)
+        (remove name args :test #'equal))
+    args))
 
 (defun *xyzzycli-helper (dir args)
   (si:*show-window-foreground)
@@ -121,6 +134,12 @@
 			   (list arg))))
 		 args))
 	waitobj)
+    (setq si:*command-line-args*
+          (consume-args si:*command-line-args* "-no-wow64-parent"
+                        #'(lambda () (setq *parent-process-wow64-p* nil))))
+    (setq si:*command-line-args*
+          (consume-args si:*command-line-args* "-wow64-parent"
+                        #'(lambda () (setq *parent-process-wow64-p* t))))
     (when (equal (car si:*command-line-args*) "-wait")
       (setq waitobj (si:*create-wait-object))
       (pop si:*command-line-args*))
@@ -179,3 +198,43 @@
 	    (funcall *initial-buffer-mode*)))))
     (trap-errors (process-command-line))
     (trap-errors (run-hooks '*post-startup-hook*))))
+
+;; this startup is called after changing (selected-frame).
+(defun startup-frame-second (frame)
+  (trap-errors (init-pseudo-frame frame))
+  (unless *inhibit-history-load*
+    (ignore-errors (load-command-bar-info frame)))
+  (ignore-errors (init-app-menus frame)))
+
+(defun startup-frame (frame parent)
+;  (trap-errors (init-misc-objects))
+;  (trap-errors (init-pseudo-frame frame))
+  (let (no-init-file
+	(cl (car si:*command-line-args*)))
+;    (when (or (equal cl "-q")
+;	      (equal cl "-no-init-file"))
+;      (setq no-init-file t)
+;      (pop si:*command-line-args*))
+;    (when *convert-registry-to-file-p*
+;      (ignore-errors (load-history-file-compat)))
+;    (unless no-init-file
+;      (trap-errors
+;	(let ((*loading-user-initial-file* t))
+;	  (load (namestring (if (file-system-supports-long-file-name-p "~/")
+;				"~/.xyzzy" "~/_xyzzy"))
+;		:if-does-not-exist nil :verbose nil :print nil)))
+;      (unless *inhibit-history-load*
+;	(ignore-errors (load-history-file))))
+;    (ignore-errors (keep-compatibility))
+;    (unless *inhibit-history-load*
+;      (ignore-errors (load-command-bar-info frame)))
+;    (ignore-errors (init-app-menus frame))
+    ; (ignore-errors (init-misc-options))
+    (ignore-errors
+     (when (and *use-global-ime*
+		(not (ignore-errors (enable-global-ime t frame))))))
+    (trap-errors
+      (let ((scratch (selected-buffer parent)))
+	(set-buffer scratch)))
+    ; (trap-errors (process-command-line))
+    (trap-errors (run-hook-with-args '*after-make-frame-functions* frame))))

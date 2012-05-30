@@ -37,6 +37,7 @@ xyzzy.BUG
 .netinst/
 usr/
 site-lisp/
+updater.exe
 
 # Release files
 _dist/

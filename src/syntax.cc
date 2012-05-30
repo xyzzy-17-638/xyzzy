@@ -1059,11 +1059,20 @@ Buffer::goto_matched_open (Point &point, Char closec) const
       if (!SBCP (c))
         continue;
 
+	  bool two_char_before_is_escaped = false;
+	  Point escape_pos(point);
+	  if(forward_char(escape_pos, -1) &&
+		  escaped_char_p(escape_pos))
+		  two_char_before_is_escaped = true;
+
+
       if (xcomment_start_second_char_p (tab, c)
-          && backward_comment_start_p (point))
+          && backward_comment_start_p (point)
+		  && !two_char_before_is_escaped)
         return Sin_comment;
       if (xcomment_end_second_char_p (tab, c)
-          && backward_comment_end_p (point))
+          && backward_comment_end_p (point)
+		  && !two_char_before_is_escaped)
         {
           status = skip_multi_chars_comment_backward (point);
           if (status)
@@ -1072,7 +1081,8 @@ Buffer::goto_matched_open (Point &point, Char closec) const
         }
       if (xcplusplus_comment_char_p (tab, c)
           && !xparse_sexp_ignore_comment_p (tab, c)
-          && backward_cplusplus_comment_p (point))
+          && backward_cplusplus_comment_p (point)
+		  && !two_char_before_is_escaped)
         return Sin_comment;
 
       switch (xchar_syntax (tab, c))
@@ -1255,6 +1265,11 @@ Buffer::goto_matched_close (Point &point, Char openc) const
           if (status)
             return status;
           break;
+
+		case SCescape:
+		  if (!forward_char (point, 1) || eobp (point))
+            return Sunmatched_paren;
+		  break;
 
         default:
           break;
@@ -1992,7 +2007,7 @@ lisp
 Ftab_columns (lisp lbuffer)
 {
   if (!lbuffer || lbuffer == Qnil)
-    return make_fixnum (app.default_tab_columns);
+    return make_fixnum (g_app.default_tab_columns);
   Buffer *bp = Buffer::coerce_to_buffer (lbuffer);
   multiple_value::count () = 2;
   multiple_value::value (1) = boole (bp->b_local_tab_columns);
@@ -2007,19 +2022,20 @@ Fset_tab_columns (lisp column, lisp lbuffer)
       int n = fixnum_value (column);
       if (n < 1 || n > 32)
         FErange_error (column);
-      if (app.default_tab_columns != n)
+      if (g_app.default_tab_columns != n)
         {
-          app.default_tab_columns = n;
+          g_app.default_tab_columns = n;
           for (Buffer *bp = Buffer::b_blist; bp; bp = bp->b_next)
             {
-              bp->b_nfolded = -1;
+			  bp->set_nfolded_all(-1);
               if (!bp->b_local_tab_columns)
                 {
                   bp->b_tab_columns = n;
                   bp->fold_width_modified ();
                 }
             }
-          for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+		  all_window_iterator itr;
+          for (Window *wp = itr.begin(); wp; wp = itr.next())
             if (wp->w_bufp && !wp->w_bufp->b_local_tab_columns)
               wp->w_disp_flags |= Window::WDF_WINDOW;
         }
@@ -2031,7 +2047,7 @@ Fset_tab_columns (lisp column, lisp lbuffer)
       if (column == Qnil)
         {
           bp->b_local_tab_columns = 0;
-          n = app.default_tab_columns;
+          n = g_app.default_tab_columns;
         }
       else
         {

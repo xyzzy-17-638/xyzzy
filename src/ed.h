@@ -10,6 +10,7 @@
 
 struct Window;
 struct Buffer;
+class ApplicationFrame;
 
 class lwindow: public lisp_object
 {
@@ -30,6 +31,27 @@ xwindow_wp (lisp x)
 {
   assert (windowp (x));
   return ((lwindow *)x)->wp;
+}
+
+class lappframe: public lisp_object
+{
+public:
+  ApplicationFrame *fp;
+};
+
+#define appframep(X) typep((X), Tappframe)
+
+inline void
+check_appframe(lisp x)
+{
+  check_type (x, Tappframe, Qappframe);
+}
+
+inline ApplicationFrame *&
+xappframe_fp (lisp x)
+{
+  assert (appframep (x));
+  return ((lappframe *)x)->fp;
 }
 
 class lbuffer: public lisp_object
@@ -236,6 +258,14 @@ make_window ()
   return p;
 }
 
+inline lappframe *
+make_appframe()
+{
+  lappframe *p = ldata <lappframe, Tappframe>::lalloc ();
+  p->fp = 0;
+  return p;
+}
+
 inline lbuffer *
 make_buffer ()
 {
@@ -271,6 +301,7 @@ make_win32_dde_handle ()
 
 struct Window;
 struct Buffer;
+class main_frame;
 
 # include "process.h"
 # include "dll.h"
@@ -317,6 +348,7 @@ public:
 
 class FKWin;
 
+
 struct Frame
 {
   Window *windows;
@@ -338,7 +370,9 @@ struct Frame
   COLORREF last_caret_color;
 
   FKWin *fnkey;
+  Frame *f_next;
 };
+
 
 struct ModelineParam
 {
@@ -358,17 +392,19 @@ struct Region
   point_t p2;
 };
 
-class Application
+/*
+This class is Frame in emacs meaning.
+But Frame is already used in xyzzy and it does not contain status bar, menu, etc.
+In xyzzy, similar concept was Application, so I create ApplicationFrame and separate from Application.
+This name should be renamed.
+*/
+class ApplicationFrame
 {
 public:
-  Application ();
-  ~Application ();
+  ApplicationFrame ();
+  ~ApplicationFrame();
 
-  static const char ToplevelClassName[];
-  static const char FrameClassName[];
-  static const char ClientClassName[];
-  static const char ModelineClassName[];
-
+  static ApplicationFrame * coerce_to_frame (lisp object);
   HINSTANCE hinst;
   HWND toplev;
   HWND hwnd_sw;
@@ -380,19 +416,19 @@ public:
   ime_comp_queue ime_compq;
 
   Frame active_frame;
+
   FontSet text_font;
   ModelineParam modeline_param;
   StatusWindow status_window;
   key_sequence keyseq;
-  itimer gc_itimer;
   itimer as_itimer;
 
   status_area stat_area;
 
   int default_tab_columns;
   int auto_save_count;
+  u_long frame_index;
 
-  int toplevel_is_active;
   int ime_composition;
   int ime_open_mode;
 
@@ -400,7 +436,6 @@ public:
   int kbd_repeat_count;
   int wait_cursor_depth;
 
-  u_int quit_thread_id;
   int sleep_timer_exhausted;
   int f_protect_quit;
 
@@ -416,24 +451,62 @@ public:
   UINT default_caret_blink_time;
   int last_blink_caret;
 
-  char dump_image[PATH_MAX + 8];
-  char *ini_file_path;
-
   lisp lquit_char;
   int quit_vkey;
   int quit_mod;
 
   ATOM atom_toplev;
   int minibuffer_prompt_column;
+  lisp lminibuffer_message;
+  lisp lminibuffer_prompt;
 
   utimer user_timer;
+  main_frame* mframe;
+
+  ApplicationFrame *a_next;
+  lisp lfp;
+};
+
+
+class Application
+{
+public:
+  Application ();
+  ~Application ();
+
+
+  static const char ToplevelClassName[];
+  static const char FrameClassName[];
+  static const char ClientClassName[];
+  static const char ModelineClassName[];
+
+  HINSTANCE hinst;
+
+  itimer gc_itimer;
+
+  char dump_image[PATH_MAX + 8];
+  char *ini_file_path;
+  int toplevel_is_active;
+  u_int quit_thread_id;
+  int default_tab_columns;
 
   void *initial_stack;
   int in_gc;
+  HANDLE startupEvent;
   int exit_code;
 };
 
-extern Application app;
+// does not take care parent (ex. ..\).
+// similar to Fmerge_pathnames, but does not require any initialization.
+errno_t ResolveModuleRelativeDir(char *dest, int destSize, const char* relative);
+// relativeDir can be null.
+errno_t ResolveModuleRelativePath(char *dest, int destSize, const char* relativeDir, const char* file);
+
+extern ApplicationFrame& active_app_frame();
+extern ApplicationFrame* first_app_frame();
+extern ApplicationFrame* retrieve_app_frame(HWND hwnd);
+extern void insert_app_frame(HWND hwnd, ApplicationFrame *app);
+extern Application g_app;
 
 class enable_quit
 {
@@ -445,7 +518,7 @@ public:
       if (!q_save)
         {
           q_enable = 1;
-          PostThreadMessage (app.quit_thread_id, WM_PRIVATE_REGISTER_HOTKEY, 0, 0);
+          PostThreadMessage (g_app.quit_thread_id, WM_PRIVATE_REGISTER_HOTKEY, 0, 0);
         }
     }
   ~enable_quit () {if (!q_save) disable ();}
@@ -453,11 +526,53 @@ public:
     {
       if (q_enable)
         {
-          PostThreadMessage (app.quit_thread_id, WM_PRIVATE_UNREGISTER_HOTKEY, 0, 0);
+          PostThreadMessage (g_app.quit_thread_id, WM_PRIVATE_UNREGISTER_HOTKEY, 0, 0);
           q_enable = 0;
         }
     }
 };
+
+void change_focus_to_frame(ApplicationFrame *app);
+void re_focus_frame(ApplicationFrame *app1);
+
+class defer_change_focus
+{
+	static int s_count;
+	static ApplicationFrame* s_focus_candidate;
+public :
+	static void request_change_focus(ApplicationFrame *app)
+	{
+		// should use semaphore, but inconsistency is not so serious in this case (just re-activate is enough).
+		if(s_count == 0)
+		{
+			change_focus_to_frame(app);
+		}
+		else
+		{
+			if(app == &active_app_frame())
+			{
+				re_focus_frame(app);
+			}
+			s_focus_candidate = app;
+		}
+	}
+	defer_change_focus() {
+		s_count++;
+	}
+	~defer_change_focus() {
+		s_count--;
+		if(s_count == 0)
+		{
+			if(s_focus_candidate)
+			{
+				change_focus_to_frame(s_focus_candidate);
+			}
+			s_focus_candidate = 0;
+		}
+	}
+
+};
+
 
 # include "Buffer.h"
 # include "Window.h"
@@ -466,23 +581,23 @@ public:
 # include "resource.h"
 
 inline Window *
-selected_window ()
+selected_window (ApplicationFrame *owner = &active_app_frame())
 {
-  return app.active_frame.selected;
+  return owner->active_frame.selected;
 }
 
 inline Buffer *
-selected_buffer ()
+selected_buffer (ApplicationFrame *app1 = &active_app_frame())
 {
-  assert (selected_window ());
-  return selected_window ()->w_bufp;
+  assert (selected_window (app1));
+  return selected_window (app1)->w_bufp;
 }
 
 inline HWND
 get_active_window ()
 {
   HWND hwnd = GetActiveWindow ();
-  return hwnd ? hwnd : app.toplev;
+  return hwnd ? hwnd : active_app_frame().toplev;
 }
 
 inline
@@ -557,15 +672,50 @@ save_restriction::save_restriction ()
 class save_cursor_depth
 {
   int odepth;
+  ApplicationFrame *appframe;
 public:
-  save_cursor_depth () : odepth (app.wait_cursor_depth) {}
+  save_cursor_depth (ApplicationFrame *app = &active_app_frame()) : odepth (app->wait_cursor_depth), appframe(app) {}
   ~save_cursor_depth ()
     {
       if (!odepth)
-        end_wait_cursor (1);
+        end_wait_cursor (1, appframe);
       else
-        app.wait_cursor_depth = odepth;
+        appframe->wait_cursor_depth = odepth;
     }
 };
+
+class all_window_iterator
+{
+	ApplicationFrame *curApp;
+	Window *curWin;
+public:
+	all_window_iterator()
+	{
+		curApp = 0;
+		curWin = 0;
+	}
+	Window* begin()
+	{
+		curApp = first_app_frame();
+		if(curApp != 0)
+			curWin = curApp->active_frame.windows;
+		return curWin;
+	}
+	Window* next()
+	{
+		if(curWin->w_next)
+		{
+			curWin = curWin->w_next;
+			return curWin;
+		}
+		curApp = curApp->a_next;
+		if(curApp == 0)
+			return 0;
+		curWin = curApp->active_frame.windows;
+		return curWin;
+	}
+
+};
+
 
 #endif

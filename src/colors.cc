@@ -58,7 +58,8 @@ load_misc_colors ()
 {
   load_default ();
 
-  int i, c;
+  int c;
+  int i;
   for (i = MC_FILER_FG; i <= MC_FILER_CURSOR; i++)
     if (read_conf (cfgFiler, xnames[i].name, c))
       xcolors[i] = c;
@@ -74,7 +75,7 @@ modify_misc_colors (const XCOLORREF *colors, int save)
   memcpy (xcolors, colors, sizeof xcolors);
   if (save)
     {
-      int i;
+	  int i;
       for (i = MC_FILER_FG; i <= MC_FILER_CURSOR; i++)
         write_conf (cfgFiler, xnames[i].name, xcolors[i].rgb, 1);
       for (; i < MC_NCOLORS; i++)
@@ -82,5 +83,5 @@ modify_misc_colors (const XCOLORREF *colors, int save)
     }
 
   Filer::modify_colors ();
-  g_frame.color_changed ();
+  active_main_frame().color_changed ();
 }

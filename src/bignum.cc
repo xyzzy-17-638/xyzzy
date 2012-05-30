@@ -279,10 +279,11 @@ br_copy (bignum_rep *old, large_int li)
 
   bignum_rep *r = br_alloc (old, 0, SHORT_PER_LONG * 2, sign);
   u_short *d = r->br_data;
-  for (u_long x = li.lo; x; x = down (x))
+  u_long x;
+  for (x = li.lo; x; x = down (x))
     *d++ = lowpart (x);
   d = r->br_data + SHORT_PER_LONG;
-  for (u_long x = li.hi; x; x = down (x))
+  for (x = li.hi; x; x = down (x))
     *d++ += lowpart (x);
   r->br_len = d - r->br_data;
   return r;
@@ -1109,7 +1110,8 @@ gcd (const bignum_rep *x, const bignum_rep *y)
     }
 
   long nshift = 0;
-  for (int i = 0; i < ul; i++)
+  int i;
+  for (i = 0; i < ul; i++)
     {
       u_long xy = x->br_data[i] | y->br_data[i];
       for (int j = 1; j < BR_RADIX; j <<= 1, nshift--)
@@ -1214,7 +1216,8 @@ logope (bignum_rep *&r, logope_code ope,
 
   r = br_calloc (r, rl);
   u_long c, i1 = x->minusp (), i2 = y->minusp ();
-  for (int i = 0; i < rl; i++)
+  int i;
+  for (i = 0; i < rl; i++)
     {
       c = i < xl ? x->br_data[i] : 0;
       i1 += x->minusp () ? lowpart (~c) : c;

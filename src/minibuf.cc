@@ -143,6 +143,8 @@ read_minibuffer (const Char *prompt, long prompt_length, lisp def,
   last_ime_mode = kbd_queue::IME_MODE_OFF;
 
   Window *mini = Window::minibuffer_window ();
+  bp->set_fold_columns(mini, Buffer::FOLD_NONE);
+
   mini->set_buffer_params (bp);
 
   mini->set_window ();
@@ -981,7 +983,7 @@ Fread_exist_buffer_name (lisp prompt, lisp keys)
 {
   lisp def = find_keyword (Kdefault, keys);
   if (def == Qnil)
-    def = Fselected_buffer ();
+    def = Fselected_buffer (Qnil);
   if (bufferp (def))
     def = Fbuffer_name (def);
   return complete_read (prompt, def, Kexist_buffer_name, Qnil, Kbuffer_name, 1, keys);

@@ -312,10 +312,10 @@ StatusWindow::paint (const DRAWITEMSTRUCT *dis)
        b < be; b++)
     {
       SIZE sz;
-      GetTextExtentPoint32W (dis->hDC, b, 1, &sz);
+      GetTextExtentPoint32W (dis->hDC, (LPCWSTR)b, 1, &sz);
       r.right += sz.cx;
       ExtTextOutW (dis->hDC, x, y, ETO_CLIPPED | ETO_OPAQUE,
-                   &r, b, 1, 0);
+                   &r, (LPCWSTR)b, 1, 0);
       r.left = r.right;
       x += sz.cx;
     }
@@ -403,7 +403,7 @@ glyph_rep::copy (const glyph_rep *src)
 }
 
 void
-Window::init (int minibufp, int temporary)
+Window::init(int minibufp, int temporary)
 {
   w_last_bufp = 0;
   w_disp_flags = WDF_WINDOW | WDF_MODELINE;
@@ -435,7 +435,7 @@ Window::init (int minibufp, int temporary)
                        Application::ClientClassName, "",
                        (WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE
                         | WS_VSCROLL | WS_HSCROLL),
-                       0, 0, 0, 0, app.active_frame.hwnd, 0, app.hinst, this))
+                       0, 0, 0, 0, w_owner->active_frame.hwnd, 0, w_owner->hinst, this))
     FEstorage_error ();
 
   if (minibufp)
@@ -443,7 +443,7 @@ Window::init (int minibufp, int temporary)
   else if (!CreateWindow (Application::ModelineClassName, "",
                           WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
                           0, 0, 0, 0,
-                          app.active_frame.hwnd, 0, app.hinst, this))
+                          w_owner->active_frame.hwnd, 0, w_owner->hinst, this))
     {
       DestroyWindow (w_hwnd);
       FEstorage_error ();
@@ -469,6 +469,7 @@ Window::Window (const Window &src)
   lwp = Qnil;
   w_next = w_prev = 0;
 #define CP(x) (x = src.x)
+  CP (w_owner);
   CP (w_bufp);
   CP (w_flags_mask);
   CP (w_flags);
@@ -502,8 +503,9 @@ Window::Window (const Window &src)
 #pragma optimize("g", off)
 #endif
 
-Window::Window (int minibufp, int temporary)
+Window::Window (ApplicationFrame* owner, int minibufp, int temporary)
 {
+  w_owner = owner;
   lwp = Qnil;
   w_bufp = 0;
   w_next = w_prev = 0;
@@ -639,7 +641,7 @@ Window::set_window ()
 {
   assert (this);
   assert (xwindow_wp (lwp) == this);
-  app.active_frame.selected = this;
+  w_owner->active_frame.selected = this;
   w_bufp->check_range (w_point);
 }
 
@@ -715,22 +717,27 @@ Window::change_parameters (const FontSetParam &param)
   change_parameters (param, 0, 0, 0, 0, false);
 }
 
+// static!
 void
 Window::change_parameters (const FontSetParam &param,
                            const XCOLORREF *colors, const XCOLORREF *mlcolors,
                            const XCOLORREF *fg, const XCOLORREF *bg,
                            bool change_color_p)
 {
-  int ocell = app.text_font.cell ().cy;
-
-  app.text_font.create (param);
+  // move init_colors outside of loop. Is this really OK?
   if (change_color_p)
     init_colors (colors, mlcolors, fg, bg);
+  for(ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next)
+  {
+	  int ocell = app1->text_font.cell ().cy;
 
-  compute_geometry (app.active_frame.size, ocell);
+	  app1->text_font.create (param);
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    wp->invalidate_glyphs ();
+	  compute_geometry (app1, app1->active_frame.size, ocell);
+
+	  for (Window *wp = app1->active_frame.windows; wp; wp = wp->w_next)
+		wp->invalidate_glyphs ();
+  }
 }
 
 static void
@@ -746,12 +753,13 @@ set_bgmode ()
 }
 
 void
-Window::create_default_windows ()
+Window::create_default_windows (ApplicationFrame *owner)
 {
-  app.text_font.init ();
+  owner->text_font.init();
 
   XCOLORREF cc[USER_DEFINABLE_COLORS];
-  for (int i = 0; i < USER_DEFINABLE_COLORS; i++)
+  int i = 0;
+  for (i = 0; i < USER_DEFINABLE_COLORS; i++)
     cc[i] = wcolor_index_names[i].rgb;
   cc[WCOLOR_TEXT] = XCOLORREF (sysdep.window_text, COLOR_WINDOWTEXT);
   cc[WCOLOR_BACK] = XCOLORREF (sysdep.window, COLOR_WINDOW);
@@ -801,8 +809,8 @@ Window::create_default_windows ()
   init_colors (cc, mlcc, fg, bg);
   set_bgmode ();
 
-  Window *wp = new Window ();
-  Window *mwp = new Window (1);
+  Window *wp = new Window (owner);
+  Window *mwp = new Window (owner, 1);
 
   wp->w_order.left = 0;
   wp->w_order.top = 0;
@@ -810,31 +818,31 @@ Window::create_default_windows ()
   wp->w_order.bottom = 1;
 
   mwp->w_rect.top = 0;
-  mwp->w_rect.bottom = app.text_font.size ().cy + sysdep.edge.cy;
+  mwp->w_rect.bottom = owner->text_font.size ().cy + sysdep.edge.cy;
 
   wp->w_prev = 0;
   wp->w_next = mwp;
   mwp->w_prev = wp;
   mwp->w_next = 0;
 
-  app.active_frame.windows = wp;
-  app.active_frame.selected = wp;
+  owner->active_frame.windows = wp;
+  owner->active_frame.selected = wp;
 
   SIZE osize = {0, 0};
-  if (!IsIconic (app.toplev))
+  if (!IsIconic (owner->toplev))
     {
       RECT r;
-      GetClientRect (app.active_frame.hwnd, &r);
-      app.active_frame.size.cx = r.right;
-      app.active_frame.size.cy = r.bottom;
+      GetClientRect (owner->active_frame.hwnd, &r);
+      owner->active_frame.size.cx = r.right;
+      owner->active_frame.size.cy = r.bottom;
     }
   else
     {
-      app.active_frame.size.cx = 10;
-      app.active_frame.size.cy = 10;
+      owner->active_frame.size.cx = 10;
+      owner->active_frame.size.cy = 10;
     }
-  Window::compute_geometry (osize);
-  Window::move_all_windows (0);
+  Window::compute_geometry (owner, osize);
+  Window::move_all_windows (owner, 0);
 }
 
 int
@@ -854,12 +862,12 @@ Window::calc_client_size (int width, int height)
 {
   w_client.cx = max (0, width);
   w_client.cy = max (0, height);
-  w_ech.cx = max (0L, ((w_client.cx - app.text_font.cell ().cx / 2)
-                       / app.text_font.cell ().cx));
-  w_ech.cy = w_client.cy / app.text_font.cell ().cy;
-  w_ch_max.cx = (w_client.cx + app.text_font.cell ().cx
-                 + app.text_font.cell ().cx / 2 - 1) / app.text_font.cell ().cx;
-  w_ch_max.cy = (w_client.cy + app.text_font.cell ().cy - 1) / app.text_font.cell ().cy;
+  w_ech.cx = max (0L, ((w_client.cx - w_owner->text_font.cell ().cx / 2)
+                       / w_owner->text_font.cell ().cx));
+  w_ech.cy = w_client.cy / w_owner->text_font.cell ().cy;
+  w_ch_max.cx = (w_client.cx + w_owner->text_font.cell ().cx
+                 + w_owner->text_font.cell ().cx / 2 - 1) / w_owner->text_font.cell ().cx;
+  w_ch_max.cy = (w_client.cy + w_owner->text_font.cell ().cy - 1) / w_owner->text_font.cell ().cy;
   if (!w_ech.cx && w_ch_max.cx)
     w_ech.cx = 1;
   if (!w_ech.cy && w_ch_max.cy)
@@ -926,24 +934,24 @@ compute_size (int *o, int n, int old_size, int new_size)
 }
 
 void
-Window::compute_geometry (const SIZE &old_size, int lcell)
+Window::compute_geometry (ApplicationFrame *owner, const SIZE &old_size, int lcell)
 {
-  if (!app.active_frame.windows)
+  if (!owner->active_frame.windows)
     return;
 
-  const SIZE &new_size = app.active_frame.size;
+  const SIZE &new_size = owner->active_frame.size;
 
   // compute minibuffer window geometry
   Window *wp;
-  for (wp = app.active_frame.windows; wp->w_next; wp = wp->w_next)
+  for (wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
     ;
   wp->w_rect.left = 0;
   wp->w_rect.right = new_size.cx;
   int old_h = wp->w_rect.bottom - wp->w_rect.top;
   int old_l = static_cast<int> (old_h / lcell);
-  int new_h = old_l * app.text_font.cell ().cy + 4;
-  int min_h = app.text_font.cell ().cy + 4;
-  int max_h = new_size.cy - (sysdep.edge.cy + FRAME_WIDTH + min_h + app.modeline_param.m_height + 4);
+  int new_h = old_l * owner->text_font.cell ().cy + 4;
+  int min_h =  owner->text_font.cell ().cy + 4;
+  int max_h = new_size.cy - (sysdep.edge.cy + FRAME_WIDTH + min_h +  owner->modeline_param.m_height + 4);
   new_h = max (new_h, min_h);
   if (max_h < new_h)
     new_h = old_h;
@@ -955,7 +963,7 @@ Window::compute_geometry (const SIZE &old_size, int lcell)
 
   long nx = 0, ny = 0;
   long ow = 0, oh = 0;
-  for (wp = app.active_frame.windows; wp->w_next; wp = wp->w_next)
+  for (wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
     {
       nx = max (nx, wp->w_order.right);
       ny = max (ny, wp->w_order.bottom);
@@ -966,7 +974,7 @@ Window::compute_geometry (const SIZE &old_size, int lcell)
   // compute normal windows geometry
   int *const ox = (int *)alloca (sizeof *ox * (nx + 1));
   int *const oy = (int *)alloca (sizeof *oy * (ny + 1));
-  for (wp = app.active_frame.windows; wp->w_next; wp = wp->w_next)
+  for (wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
     {
       ox[wp->w_order.left] = wp->w_rect.left;
       oy[wp->w_order.top] = wp->w_rect.top;
@@ -977,7 +985,7 @@ Window::compute_geometry (const SIZE &old_size, int lcell)
   compute_size (ox, nx, ow, new_size.cx);
   compute_size (oy, ny, oh, new_size.cy - new_h);
 
-  for (wp = app.active_frame.windows; wp->w_next; wp = wp->w_next)
+  for (wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
     {
       wp->w_rect.left = ox[wp->w_order.left];
       wp->w_rect.top = oy[wp->w_order.top];
@@ -990,33 +998,34 @@ Window::compute_geometry (const SIZE &old_size, int lcell)
         cx -= sysdep.vscroll;
       if (wp->flags () & WF_HSCROLL_BAR)
         cy -= sysdep.hscroll;
-      if (wp->w_rect.right != app.active_frame.size.cx)
+      if (wp->w_rect.right != owner->active_frame.size.cx)
         cx -= FRAME_WIDTH;
       cx -= RIGHT_PADDING;
       if (wp->w_hwnd_ml)
-        cy -= app.modeline_param.m_height + 4 + FRAME_WIDTH;
+        cy -= owner->modeline_param.m_height + 4 + FRAME_WIDTH;
       if (!wp->minibuffer_window_p () && wp->flags () & WF_RULER)
         cy -= RULER_HEIGHT;
 
       wp->calc_client_size (cx, cy);
     }
 
-  app.active_frame.windows_moved = 1;
+  owner->active_frame.windows_moved = 1;
 }
 
 void
-Window::move_all_windows (int update)
+Window::move_all_windows (ApplicationFrame* owner, int update)
 {
   int mod = 0;
-  app.active_frame.windows_moved = 0;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  owner->active_frame.windows_moved = 0;
+  Window *wp;
+  for (wp = owner->active_frame.windows; wp; wp = wp->w_next)
     {
       int cx, cy;
       int mlh;
       if (wp->w_hwnd_ml)
         {
-          mlh = wp->flags () & WF_MODE_LINE ? app.modeline_param.m_height + 4 : 0;
-          cx = wp->w_rect.right == app.active_frame.size.cx ? 0 : FRAME_WIDTH;
+          mlh = wp->flags () & WF_MODE_LINE ? owner->modeline_param.m_height + 4 : 0;
+          cx = wp->w_rect.right == owner->active_frame.size.cx ? 0 : FRAME_WIDTH;
           cy = FRAME_WIDTH;
         }
       else
@@ -1063,7 +1072,7 @@ Window::move_all_windows (int update)
         }
     }
 
-  for (Window *wp = app.active_frame.reserved; wp; wp = wp->w_next)
+  for (wp = owner->active_frame.reserved; wp; wp = wp->w_next)
     {
       MoveWindow (wp->w_hwnd, 0, 0, 0, 0, 1);
       if (wp->w_hwnd_ml)
@@ -1072,24 +1081,24 @@ Window::move_all_windows (int update)
 
   if (mod)
     {
-      for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+      for (wp = owner->active_frame.windows; wp; wp = wp->w_next)
         if (wp->w_bufp)
           wp->w_bufp->window_size_changed ();
 
-      InvalidateRect (app.active_frame.hwnd, 0, 1);
-      InvalidateRect (app.toplev, 0, 1);
+      InvalidateRect (owner->active_frame.hwnd, 0, 1);
+      InvalidateRect (owner->toplev, 0, 1);
       if (update)
         {
-          UpdateWindow (app.active_frame.hwnd);
-          UpdateWindow (app.toplev);
+          UpdateWindow (owner->active_frame.hwnd);
+          UpdateWindow (owner->toplev);
         }
     }
 }
 
 void
-Window::repaint_all_windows ()
+Window::repaint_all_windows (ApplicationFrame* owner)
 {
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (Window *wp = owner->active_frame.windows; wp; wp = wp->w_next)
     if (!GetUpdateRect (wp->w_hwnd, 0, 0))
       wp->update_window ();
 }
@@ -1098,12 +1107,15 @@ void
 Window::destroy_windows ()
 {
   Window *wp, *next;
-  for (wp = app.active_frame.deleted; wp; wp = next)
-    {
-      next = wp->w_next;
-      delete wp;
-    }
-  app.active_frame.deleted = 0;
+  for (ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next)
+  {
+	  for (wp = app1->active_frame.deleted; wp; wp = next)
+		{
+		  next = wp->w_next;
+		  delete wp;
+		}
+	  app1->active_frame.deleted = 0;
+  }
 }
 
 void
@@ -1118,9 +1130,9 @@ Window::update_vscroll_bar ()
           ShowScrollBar (w_hwnd, SB_VERT, 1);
         }
       int nlines = (w_bufp
-                    ? (w_bufp->b_fold_columns == Buffer::FOLD_NONE
+                    ? (get_fold_columns() == Buffer::FOLD_NONE
                        ? w_bufp->count_lines ()
-                       : w_bufp->folded_count_lines ())
+                       : w_bufp->folded_count_lines (get_fold_columns()))
                     : 1);
       if (!(flags () & WF_ALT_VSCROLL_BAR))
         nlines += w_ech.cy - 1;
@@ -1249,7 +1261,7 @@ Window::update_hscroll_bar ()
         }
       int pos;
       int w;
-      if (!w_bufp || w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+      if (!w_bufp || get_fold_columns() == Buffer::FOLD_NONE)
         {
 #define PAGES_PER_WIDTH 20
           w = w_ech.cx * PAGES_PER_WIDTH;
@@ -1258,7 +1270,7 @@ Window::update_hscroll_bar ()
         }
       else
         {
-          w = w_bufp->b_fold_columns;
+          w = get_fold_columns();
           if (flags () & WF_LINE_NUMBER)
             w += LINENUM_COLUMNS;
           pos = min (w_last_top_column, long (w - w_ech.cx));
@@ -1350,10 +1362,10 @@ Window::coerce_to_window (lisp object)
 }
 
 Window *
-Window::minibuffer_window ()
+Window::minibuffer_window (ApplicationFrame *owner)
 {
-  Window *wp;
-  for (wp = app.active_frame.windows; wp->w_next; wp = wp->w_next)
+  Window *wp ;
+  for (wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
     ;
   return wp;
 }
@@ -1362,17 +1374,12 @@ int
 Window::count_windows ()
 {
   int n = 0;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next, n++)
+  // TODO: check whether this is OK or should use all_window_iterator.
+  for (Window *wp = active_app_frame().active_frame.windows; wp; wp = wp->w_next, n++)
     ;
   return n;
 }
 
-void
-Window::modify_all_mode_line ()
-{
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
-    wp->w_disp_flags |= WDF_MODELINE;
-}
 
 void
 Window::split (int nlines, int verticalp)
@@ -1395,7 +1402,7 @@ Window::split (int nlines, int verticalp)
         }
       else
         {
-          int ml = app.modeline_param.m_height + 4;
+          int ml = w_owner->modeline_param.m_height + 4;
           if (nlines > 0)
             {
               h0 = nlines;
@@ -1408,9 +1415,9 @@ Window::split (int nlines, int verticalp)
               h0 = w_ech.cy - h1 - 1;
               current = 1;
             }
-          pxl = (h0 * app.text_font.cell ().cy + ml
+          pxl = (h0 * w_owner->text_font.cell ().cy + ml
                  + (w_rect.bottom - w_rect.top - ml
-                    - (h0 + h1) * app.text_font.cell ().cy) / 2);
+                    - (h0 + h1) * w_owner->text_font.cell ().cy) / 2);
         }
 
       if (h0 < 1 || h1 < 1)
@@ -1439,9 +1446,9 @@ Window::split (int nlines, int verticalp)
               h0 = w_ech.cx - h1 - 1;
               current = 1;
             }
-          pxl = (h0 * app.text_font.cell ().cx
+          pxl = (h0 * w_owner->text_font.cell ().cx
                  + (w_rect.right - w_rect.left
-                    - (h0 + h1) * app.text_font.cell ().cx) / 2);
+                    - (h0 + h1) * w_owner->text_font.cell ().cx) / 2);
         }
 #define WINDOW_WIDTH_MIN 10
       if (h0 < WINDOW_WIDTH_MIN || h1 < WINDOW_WIDTH_MIN)
@@ -1463,8 +1470,8 @@ Window::split (int nlines, int verticalp)
       w_rect.bottom = w_rect.top + pxl;
       wp->w_rect.top = w_rect.bottom;
 
-      Window *w;
-      for (w = app.active_frame.windows; w->w_next; w = w->w_next)
+	  Window *w;
+      for (w = w_owner->active_frame.windows; w->w_next; w = w->w_next)
         if (w != wp && w->w_rect.top == wp->w_rect.top)
           {
             w_order.bottom = w->w_order.top;
@@ -1475,7 +1482,7 @@ Window::split (int nlines, int verticalp)
       if (!w->w_next)
         {
           int y, o;
-          for (w = app.active_frame.windows, y = o = 0; w->w_next; w = w->w_next)
+          for (w = w_owner->active_frame.windows, y = o = 0; w->w_next; w = w->w_next)
             if (w->w_rect.top < wp->w_rect.top && w->w_rect.top > y)
               {
                 y = w->w_rect.top;
@@ -1483,7 +1490,7 @@ Window::split (int nlines, int verticalp)
               }
           w_order.bottom = o + 1;
           wp->w_order.top = o + 1;
-          for (w = app.active_frame.windows; w->w_next; w = w->w_next)
+          for (w = w_owner->active_frame.windows; w->w_next; w = w->w_next)
             {
               if (w != wp && w->w_order.top > o)
                 w->w_order.top++;
@@ -1500,8 +1507,8 @@ Window::split (int nlines, int verticalp)
       w_rect.right = w_rect.left + pxl;
       wp->w_rect.left = w_rect.right;
 
-      Window *w;
-      for (w = app.active_frame.windows; w->w_next; w = w->w_next)
+	  Window *w;
+      for (w = w_owner->active_frame.windows; w->w_next; w = w->w_next)
         if (w != wp && w->w_rect.left == wp->w_rect.left)
           {
             w_order.right = w->w_order.left;
@@ -1512,7 +1519,7 @@ Window::split (int nlines, int verticalp)
       if (!w->w_next)
         {
           int x, o;
-          for (w = app.active_frame.windows, x = o = 0; w->w_next; w = w->w_next)
+          for (w = w_owner->active_frame.windows, x = o = 0; w->w_next; w = w->w_next)
             if (w->w_rect.left < wp->w_rect.left && w->w_rect.left > x)
               {
                 x = w->w_rect.left;
@@ -1520,7 +1527,7 @@ Window::split (int nlines, int verticalp)
               }
           w_order.right = o + 1;
           wp->w_order.left = o + 1;
-          for (w = app.active_frame.windows; w->w_next; w = w->w_next)
+          for (w = w_owner->active_frame.windows; w->w_next; w = w->w_next)
             {
               if (w != wp && w->w_order.left > o)
                 w->w_order.left++;
@@ -1533,7 +1540,7 @@ Window::split (int nlines, int verticalp)
   if (current)
     wp->set_window ();
 
-  compute_geometry ();
+  compute_geometry (w_owner);
   wp->change_color ();
   Buffer::maybe_modify_buffer_bar ();
 }
@@ -1555,13 +1562,13 @@ Window::close ()
     for (WindowConfiguration::Data *d = wc->wc_data, *de = d + wc->wc_nwindows; d < de; d++)
       if (d->wp == this)
         {
-          w_next = app.active_frame.reserved;
-          app.active_frame.reserved = this;
+          w_next = w_owner->active_frame.reserved;
+          w_owner->active_frame.reserved = this;
           return;
         }
 
-  w_next = app.active_frame.deleted;
-  app.active_frame.deleted = this;
+  w_next = w_owner->active_frame.deleted;
+  w_owner->active_frame.deleted = this;
 }
 
 void
@@ -1570,10 +1577,10 @@ Window::delete_other_windows ()
   if (minibuffer_window_p ())
     return;
 
-  Window *mini = minibuffer_window ();
+  Window *mini = minibuffer_window (w_owner);
 
   int f = 0;
-  for (Window *wp = app.active_frame.windows, *next; wp; wp = next)
+  for (Window *wp = w_owner->active_frame.windows, *next; wp; wp = next)
     {
       next = wp->w_next;
       if (wp != this && wp != mini)
@@ -1586,7 +1593,7 @@ Window::delete_other_windows ()
   if (!f)
     return;
 
-  app.active_frame.windows = this;
+  w_owner->active_frame.windows = this;
   set_window ();
   w_prev = 0;
   w_next = mini;
@@ -1598,14 +1605,15 @@ Window::delete_other_windows ()
   w_order.top = 0;
   w_order.bottom = 1;
 
-  compute_geometry ();
+  compute_geometry (w_owner);
   Buffer::maybe_modify_buffer_bar ();
 }
 
 lisp
-Fdelete_other_windows ()
+Fdelete_other_windows (lisp lapp)
 {
-  selected_window ()->delete_other_windows ();
+  ApplicationFrame *app = ApplicationFrame::coerce_to_frame(lapp);
+  selected_window (app)->delete_other_windows ();
   return Qt;
 }
 
@@ -1614,7 +1622,7 @@ Window::find_resizeable_edge (LONG RECT::*edge1, LONG RECT::*edge2,
                               LONG RECT::*match1, LONG RECT::*match2) const
 {
   int n = 0;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (Window *wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (!wp->minibuffer_window_p () && wp->w_order.*edge1 == w_order.*edge2)
       {
         if (wp->w_order.*match1 == w_order.*match1)
@@ -1644,7 +1652,8 @@ void
 Window::resize_edge (LONG RECT::*edge1, LONG RECT::*edge2,
                      LONG RECT::*match1, LONG RECT::*match2) const
 {
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  Window *wp;
+  for (wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (!wp->minibuffer_window_p ()
         && wp->w_order.*edge1 == w_order.*edge2
         && wp->w_order.*match1 >= w_order.*match1
@@ -1654,11 +1663,11 @@ Window::resize_edge (LONG RECT::*edge1, LONG RECT::*edge2,
         wp->w_rect.*edge1 = w_rect.*edge1;
       }
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (!wp->minibuffer_window_p () && wp->w_order.*edge2 == w_order.*edge2)
       return;
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (!wp->minibuffer_window_p ())
       {
         if (wp->w_order.*edge2 > w_order.*edge2)
@@ -1682,20 +1691,20 @@ Window::resize_edge (int f) const
 }
 
 Window *
-Window::find_point_window (POINT &p)
+Window::find_point_window (ApplicationFrame* owner, POINT &p)
 {
   Window *wp;
-  for (wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (wp = owner->active_frame.windows; wp; wp = wp->w_next)
     if (PtInRect (&wp->w_rect, p))
       break;
   return wp;
 }
 
 Window *
-Window::find_scr_point_window (const POINT &pt, int ml, int *in_ml)
+Window::find_scr_point_window (ApplicationFrame* owner, const POINT &pt, int ml, int *in_ml)
 {
   Window *wp;
-  for (wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (wp = owner->active_frame.windows; wp; wp = wp->w_next)
     {
       RECT r;
       GetWindowRect (wp->w_hwnd, &r);
@@ -1737,7 +1746,7 @@ Window::delete_window ()
       if (!f)
         return 0;
       can->w_prev = 0;
-      app.active_frame.windows = can;
+      w_owner->active_frame.windows = can;
     }
   else
     {
@@ -1757,11 +1766,11 @@ Window::delete_window ()
   resize_edge (f);
   save_buffer_params ();
   close ();
-  Window *wp = find_point_window (op);
+  Window *wp = find_point_window (w_owner, op);
   if (!wp || !wp->w_bufp)
     wp = can;
   wp->set_window ();
-  compute_geometry ();
+  compute_geometry (w_owner);
   Buffer::maybe_modify_buffer_bar ();
   return 1;
 }
@@ -1780,17 +1789,18 @@ Fdeleted_window_p (lisp window)
 }
 
 lisp
-Fselected_window ()
+Fselected_window (lisp lapp)
 {
-  assert (xwindow_wp (selected_window ()->lwp));
-  assert (xwindow_wp (selected_window ()->lwp) == selected_window ());
-  return selected_window ()->lwp;
+	ApplicationFrame *app = ApplicationFrame::coerce_to_frame(lapp);
+  assert (xwindow_wp (selected_window (app)->lwp));
+  assert (xwindow_wp (selected_window (app)->lwp) == selected_window (app));
+  return selected_window (app)->lwp;
 }
 
 lisp
-Fminibuffer_window ()
+Fminibuffer_window (lisp frame)
 {
-  return Window::minibuffer_window ()->lwp;
+  return Window::minibuffer_window (ApplicationFrame::coerce_to_frame(frame) )->lwp;
 }
 
 lisp
@@ -1811,6 +1821,7 @@ lisp
 Fnext_window (lisp window, lisp minibufp)
 {
   Window *wp = Window::coerce_to_window (window);
+  ApplicationFrame *owner = wp->w_owner;
   if (!minibufp)
     minibufp = Qnil;
   Window *next = wp->w_next;
@@ -1818,7 +1829,7 @@ Fnext_window (lisp window, lisp minibufp)
       || (!next->w_bufp && minibufp != Qt)
       || (next->minibuffer_window_p ()
           && minibufp != Qnil && minibufp != Qt))
-    next = app.active_frame.windows;
+    next = owner->active_frame.windows;
   return next->lwp;
 }
 
@@ -1844,8 +1855,9 @@ Fget_buffer_window (lisp buffer, lisp curwin)
   Buffer *bp = Buffer::coerce_to_buffer (buffer);
   Window *cwp = ((curwin && curwin != Qnil)
                  ? Window::coerce_to_window (curwin) : 0);
+  ApplicationFrame *owner = cwp != 0 ? cwp->w_owner : &active_app_frame();
   int f = 0;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (Window *wp = owner->active_frame.windows; wp; wp = wp->w_next)
     if (wp->w_bufp == bp)
       {
         if (wp != cwp)
@@ -1870,20 +1882,20 @@ Fset_window (lisp window)
 lisp
 Fscreen_width ()
 {
-  return make_fixnum (app.active_frame.size.cx / app.text_font.cell ().cx);
+  return make_fixnum (active_app_frame().active_frame.size.cx / active_app_frame().text_font.cell ().cx);
 }
 
 lisp
 Fscreen_height ()
 {
-  return make_fixnum (app.active_frame.size.cy / app.text_font.cell ().cy);
+  return make_fixnum (active_app_frame().active_frame.size.cy / active_app_frame().text_font.cell ().cy);
 }
 
 lisp
 Fwindow_height (lisp window)
 {
   int h = (Window::coerce_to_window (window)->w_clsize.cy
-           / app.text_font.cell ().cy);
+           / Window::coerce_to_window (window)->w_owner->text_font.cell ().cy);
   return make_fixnum (max (h, 1));
 }
 
@@ -1891,8 +1903,8 @@ lisp
 Fwindow_width (lisp window)
 {
   int w = ((Window::coerce_to_window (window)->w_clsize.cx
-            - app.text_font.cell ().cx / 2)
-           / app.text_font.cell ().cx);
+            - Window::coerce_to_window (window)->w_owner->text_font.cell ().cx / 2)
+           / Window::coerce_to_window (window)->w_owner->text_font.cell ().cx);
   return make_fixnum (max (w, 1));
 }
 
@@ -1900,7 +1912,7 @@ lisp
 Fwindow_lines (lisp window)
 {
   int h = (Window::coerce_to_window (window)->w_clsize.cy
-           / app.text_font.cell ().cy);
+           / Window::coerce_to_window (window)->w_owner->text_font.cell ().cy);
   return make_fixnum (max (h, 1));
 }
 
@@ -1908,8 +1920,8 @@ lisp
 Fwindow_columns (lisp window)
 {
   Window *wp = Window::coerce_to_window (window);
-  int w = ((wp->w_clsize.cx - app.text_font.cell ().cx / 2)
-           / app.text_font.cell ().cx);
+  int w = ((wp->w_clsize.cx - wp->w_owner->text_font.cell ().cx / 2)
+           / wp->w_owner->text_font.cell ().cx);
   if (wp->flags () & Window::WF_LINE_NUMBER)
     w -= Window::LINENUM_COLUMNS + 1;
   if (wp->flags () & Window::WF_FOLD_MARK
@@ -1925,11 +1937,11 @@ Fget_window_line (lisp window)
   Window *wp = Window::coerce_to_window (window);
   if (!wp->w_bufp)
     return Qnil;
-  return make_fixnum (wp->w_bufp->b_fold_columns == Buffer::FOLD_NONE
+  return make_fixnum (wp->get_fold_columns() == Buffer::FOLD_NONE
                       ? (wp->w_bufp->point_linenum (wp->w_point)
                          - wp->w_bufp->point_linenum (wp->w_disp))
-                      : (wp->w_bufp->folded_point_linenum (wp->w_point)
-                         - wp->w_bufp->folded_point_linenum (wp->w_disp)));
+                      : (wp->folded_point_linenum (wp->w_point)
+                         - wp->folded_point_linenum (wp->w_disp)));
 }
 
 lisp
@@ -1938,24 +1950,24 @@ Fget_window_start_line (lisp window)
   Window *wp = Window::coerce_to_window (window);
   if (!wp->w_bufp)
     return Qnil;
-  return make_fixnum (wp->w_bufp->b_fold_columns == Buffer::FOLD_NONE
+  return make_fixnum (wp->get_fold_columns() == Buffer::FOLD_NONE
                       ? wp->w_bufp->point_linenum (wp->w_disp)
-                      : wp->w_bufp->folded_point_linenum (wp->w_disp));
+                      : wp->folded_point_linenum (wp->w_disp));
 }
 
 lisp
 Fget_window_handle (lisp window)
 {
   if (!window || window == Qnil)
-    return make_fixnum (long (app.toplev));
+    return make_fixnum (long (active_app_frame().toplev));
   return make_fixnum (long (Window::coerce_to_window (window)->w_hwnd));
 }
 
 int
-Window::find_horiz_order (int y)
+Window::find_horiz_order (ApplicationFrame* owner, int y)
 {
   int y0 = y;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (Window *wp = owner->active_frame.windows; wp; wp = wp->w_next)
     {
       if (wp->w_rect.top > y && (y0 == y || wp->w_rect.top < y0))
         y0 = wp->w_rect.top;
@@ -1972,7 +1984,8 @@ Window::change_horiz_size (int bottom, int xmin, int xmax)
   if (obottom == bottom)
     return;
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  Window *wp;
+  for (wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (wp->w_rect.left < xmax && wp->w_rect.right > xmin)
       {
         if (wp->w_rect.top == obottom)
@@ -1981,9 +1994,9 @@ Window::change_horiz_size (int bottom, int xmin, int xmax)
           wp->w_rect.bottom = bottom;
       }
 
-  for (int y = find_horiz_order (-1), order = 0;
-       y >= 0; y = find_horiz_order (y), order++)
-    for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (int y = find_horiz_order (w_owner, -1), order = 0;
+       y >= 0; y = find_horiz_order (w_owner, y), order++)
+    for (wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
       {
         if (wp->w_rect.top == y)
           wp->w_order.top = order;
@@ -1991,14 +2004,14 @@ Window::change_horiz_size (int bottom, int xmin, int xmax)
           wp->w_order.bottom = order;
       }
 
-  compute_geometry ();
+  compute_geometry (w_owner);
 }
 
 int
-Window::find_vert_order (int x)
+Window::find_vert_order (ApplicationFrame* owner, int x)
 {
   int x0 = x;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (Window *wp = owner->active_frame.windows; wp; wp = wp->w_next)
     {
       if (wp->w_rect.left > x && (x0 == x || wp->w_rect.left < x0))
         x0 = wp->w_rect.left;
@@ -2015,7 +2028,8 @@ Window::change_vert_size (int right, int ymin, int ymax)
   if (oright == right)
     return;
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  Window *wp;
+  for (wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (wp->w_rect.top < ymax && wp->w_rect.bottom > ymin)
       {
         if (wp->w_rect.left == oright)
@@ -2024,9 +2038,9 @@ Window::change_vert_size (int right, int ymin, int ymax)
           wp->w_rect.right = right;
       }
 
-  for (int x = find_vert_order (-1), order = 0;
-       x >= 0; x = find_vert_order (x), order++)
-    for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (int x = find_vert_order (w_owner, -1), order = 0;
+       x >= 0; x = find_vert_order (w_owner, x), order++)
+    for (wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
       {
         if (wp->w_rect.left == x)
           wp->w_order.left = order;
@@ -2034,7 +2048,7 @@ Window::change_vert_size (int right, int ymin, int ymax)
           wp->w_order.right = order;
       }
 
-  compute_geometry ();
+  compute_geometry (w_owner);
 }
 
 int
@@ -2044,7 +2058,7 @@ Window::enlarge_window_horiz (int n)
   Window *wp2 = find_horiz_window (&RECT::right);
   if (!wp1 || !wp2)
     return 0;
-  int goal = w_rect.bottom + n * app.text_font.cell ().cy;
+  int goal = w_rect.bottom + n * w_owner->text_font.cell ().cy;
   if (goal < get_horiz_min (wp1->w_rect.left, wp2->w_rect.right)
       || goal > get_horiz_max (wp1->w_rect.left, wp2->w_rect.right))
     return 0;
@@ -2059,7 +2073,7 @@ Window::enlarge_window_vert (int n)
   Window *wp2 = find_vert_window (&RECT::bottom);
   if (!wp1 || !wp2)
     return 0;
-  int goal = w_rect.right + n * app.text_font.cell ().cx;
+  int goal = w_rect.right + n * w_owner->text_font.cell ().cx;
   if (goal < get_vert_min (wp1->w_rect.top, wp2->w_rect.bottom)
       || goal > get_vert_max (wp1->w_rect.top, wp2->w_rect.bottom))
     return 0;
@@ -2074,13 +2088,13 @@ Window::enlarge_window (int n, int side)
     return 1;
   if (!side)
     {
-      Window *wp1, *wp2;
-      for (wp1 = app.active_frame.windows; wp1; wp1 = wp1->w_next)
+	  Window *wp1, *wp2;
+      for (wp1 = w_owner->active_frame.windows; wp1; wp1 = wp1->w_next)
         if (wp1->w_rect.bottom == w_rect.top
             && wp1->w_rect.left < w_rect.right
             && wp1->w_rect.right > w_rect.left)
           break;
-      for (wp2 = app.active_frame.windows; wp2; wp2 = wp2->w_next)
+      for (wp2 = w_owner->active_frame.windows; wp2; wp2 = wp2->w_next)
         if (wp2->w_rect.top == w_rect.bottom
             && wp2->w_rect.left < w_rect.right
             && wp2->w_rect.right > w_rect.left)
@@ -2094,8 +2108,8 @@ Window::enlarge_window (int n, int side)
     {
       if (enlarge_window_vert (n))
         return 1;
-      Window *wp;
-      for (wp = app.active_frame.windows; wp; wp = wp->w_next)
+	  Window *wp;
+      for (wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
         if (wp->w_rect.right == w_rect.left
             && wp->w_rect.top < w_rect.bottom
             && wp->w_rect.bottom > w_rect.top)
@@ -2115,10 +2129,10 @@ Fenlarge_window (lisp nlines, lisp side)
 }
 
 Window *
-Window::find_point_window (const POINT &point, int &vert)
+Window::find_point_window (ApplicationFrame* owner, const POINT &point, int &vert)
 {
-  if (app.active_frame.windows)
-    for (Window *wp = app.active_frame.windows; wp->w_next; wp = wp->w_next)
+  if (owner->active_frame.windows)
+    for (Window *wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
       if (PtInRect (&wp->w_rect, point))
         {
           if (point.x >= wp->w_rect.right - (FRAME_WIDTH + 1))
@@ -2133,7 +2147,7 @@ Window::find_point_window (const POINT &point, int &vert)
 }
 
 int
-Window::frame_window_setcursor (HWND hwnd, WPARAM, LPARAM lparam)
+Window::frame_window_setcursor (ApplicationFrame *owner, HWND hwnd, WPARAM, LPARAM lparam)
 {
   if (LOWORD (lparam) == HTCLIENT)
     {
@@ -2141,7 +2155,7 @@ Window::frame_window_setcursor (HWND hwnd, WPARAM, LPARAM lparam)
       GetCursorPos (&point);
       ScreenToClient (hwnd, &point);
       int vert;
-      if (find_point_window (point, vert))
+      if (find_point_window (owner, point, vert))
         {
           SetCursor (vert ? sysdep.hcur_sizewe : sysdep.hcur_sizens);
           return 1;
@@ -2155,7 +2169,7 @@ Window::find_resizeable_window (LONG RECT::*target,
                                 LONG RECT::*emin, LONG RECT::*emax,
                                 LONG RECT::*edge1, LONG RECT::*edge2) const
 {
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (Window *wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (wp != this && wp->w_rect.*edge1 == w_rect.*edge2)
       {
         if (wp->w_rect.*target == w_rect.*target)
@@ -2184,11 +2198,11 @@ int
 Window::get_horiz_min (int xmin, int xmax) const
 {
   int y = w_rect.top;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (Window *wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (wp->w_rect.bottom == w_rect.bottom
         && wp->w_rect.left < xmax && wp->w_rect.right > xmin)
       y = max (y, int (wp->w_rect.top));
-  y += (app.modeline_param.m_height + 4 + app.text_font.cell ().cy
+  y += (w_owner->modeline_param.m_height + 4 + w_owner->text_font.cell ().cy
         + sysdep.edge.cy + FRAME_WIDTH);
   if (!minibuffer_window_p () && flags () & WF_RULER)
     y += RULER_HEIGHT;
@@ -2200,15 +2214,15 @@ Window::get_horiz_max (int xmin, int xmax) const
 {
   Window *mini = minibuffer_window ();
   int y = mini->w_rect.bottom;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (Window *wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (wp->w_rect.top == w_rect.bottom
         && wp->w_rect.left < xmax && wp->w_rect.right > xmin)
       y = min (y, int (wp->w_rect.bottom));
   if (y == mini->w_rect.bottom)
-    y -= app.text_font.cell ().cy + sysdep.edge.cy;
+    y -= w_owner->text_font.cell ().cy + sysdep.edge.cy;
   else
     {
-      y -= (app.modeline_param.m_height + 4 + app.text_font.cell ().cy
+      y -= (w_owner->modeline_param.m_height + 4 + w_owner->text_font.cell ().cy
             + sysdep.edge.cy + FRAME_WIDTH);
       if (flags () & WF_RULER)
         y -= RULER_HEIGHT;
@@ -2220,44 +2234,44 @@ int
 Window::get_vert_min (int ymin, int ymax) const
 {
   int x = w_rect.left;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  for (Window *wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (wp->w_rect.right == w_rect.right
         && wp->w_rect.top < ymax && wp->w_rect.bottom > ymin)
       x = max (x, int (wp->w_rect.left));
-  x += app.text_font.cell ().cx * WINDOW_WIDTH_MIN;
+  x += w_owner->text_font.cell ().cx * WINDOW_WIDTH_MIN;
   return min (x, int (w_rect.right));
 }
 
 int
 Window::get_vert_max (int ymin, int ymax) const
 {
-  int x = app.active_frame.size.cx;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  int x = w_owner->active_frame.size.cx;
+  for (Window *wp = w_owner->active_frame.windows; wp; wp = wp->w_next)
     if (wp->w_rect.left == w_rect.right
         && wp->w_rect.top < ymax && wp->w_rect.bottom > ymin)
       x = min (x, int (wp->w_rect.right));
-  x -= app.text_font.cell ().cx * WINDOW_WIDTH_MIN;
+  x -= w_owner->text_font.cell ().cx * WINDOW_WIDTH_MIN;
   return x;
 }
 
 static void
-paint_resize_line (HWND hwnd, const RECT &cr, int vert)
+paint_resize_line (ApplicationFrame *owner, HWND hwnd, const RECT &cr, int vert)
 {
   RECT r = cr;
   if (vert)
     r.left -= FRAME_WIDTH;
   else
     r.top -= FRAME_WIDTH;
-  MapWindowPoints (hwnd, app.toplev, (POINT *)&r, 2);
-  HDC hdc = GetDC (app.toplev);
-  HBITMAP hbm = LoadBitmap (app.hinst, MAKEINTRESOURCE (IDB_CHECK));
+  MapWindowPoints (hwnd, owner->toplev, (POINT *)&r, 2);
+  HDC hdc = GetDC (owner->toplev);
+  HBITMAP hbm = LoadBitmap (owner->hinst, MAKEINTRESOURCE (IDB_CHECK));
   HBRUSH hbr = CreatePatternBrush (hbm);
   DeleteObject (hbm);
   HGDIOBJ obr = SelectObject (hdc, hbr);
   PatBlt (hdc, r.left, r.top, r.right - r.left, r.bottom - r.top, PATINVERT);
   SelectObject (hdc, obr);
   DeleteObject (hbr);
-  ReleaseDC (app.toplev, hdc);
+  ReleaseDC (owner->toplev, hdc);
 }
 
 int
@@ -2296,7 +2310,7 @@ Window::frame_window_resize (HWND hwnd, const POINT &point, int vert)
       r.top = r.bottom = w_rect.bottom;
       d = w_rect.bottom - point.y;
     }
-  paint_resize_line (hwnd, r, vert);
+  paint_resize_line (w_owner, hwnd, r, vert);
   SetCapture (hwnd);
 
   MSG msg;
@@ -2312,7 +2326,7 @@ Window::frame_window_resize (HWND hwnd, const POINT &point, int vert)
       switch (msg.message)
         {
         case WM_MOUSEMOVE:
-          paint_resize_line (hwnd, r, vert);
+          paint_resize_line (w_owner, hwnd, r, vert);
           if (vert)
             r.left = r.right = min (max (nmin,
                                          short (LOWORD (msg.lParam)) + d),
@@ -2321,12 +2335,12 @@ Window::frame_window_resize (HWND hwnd, const POINT &point, int vert)
             r.top = r.bottom = min (max (nmin,
                                          short (HIWORD (msg.lParam)) + d),
                                     nmax);
-          paint_resize_line (hwnd, r, vert);
+          paint_resize_line (w_owner, hwnd, r, vert);
           break;
 
         case WM_LBUTTONUP:
           ReleaseCapture ();
-          paint_resize_line (hwnd, r, vert);
+          paint_resize_line (w_owner, hwnd, r, vert);
           if (vert)
             change_vert_size (min (max (nmin, short (LOWORD (msg.lParam)) + d), nmax),
                               r.top, r.bottom);
@@ -2349,18 +2363,18 @@ Window::frame_window_resize (HWND hwnd, const POINT &point, int vert)
         }
     }
 done:
-  paint_resize_line (hwnd, r, vert);
+  paint_resize_line (w_owner, hwnd, r, vert);
   return 1;
 }
 
 int
-Window::frame_window_resize (HWND hwnd, LPARAM lparam, const POINT *real)
+Window::frame_window_resize (ApplicationFrame* owner, HWND hwnd, LPARAM lparam, const POINT *real)
 {
   POINT point;
   point.x = short (LOWORD (lparam));
   point.y = short (HIWORD (lparam));
   int vert;
-  Window *wp = Window::find_point_window (point, vert);
+  Window *wp = Window::find_point_window (owner, point, vert);
   if (!wp)
     return 0;
   return wp->frame_window_resize (hwnd, real ? *real : point, vert);
@@ -2372,12 +2386,13 @@ WindowConfiguration::WindowConfiguration ()
   wc_data = new Data[wc_nwindows];
 
   wc_selected = selected_window ();
-  wc_size = app.active_frame.size;
+  wc_size = active_app_frame().active_frame.size;
   wc_prev = wc_chain;
   wc_chain = this;
 
   Data *d = wc_data;
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next, d++)
+  //TODO: check whether this is OK or should use all_window_iterator.
+  for (Window *wp = active_app_frame().active_frame.windows; wp; wp = wp->w_next, d++)
     {
       d->wp = wp;
       d->bufp = wp->w_bufp;
@@ -2401,18 +2416,20 @@ WindowConfiguration::~WindowConfiguration ()
 {
   wc_chain = wc_prev;
 
-  for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+  Window *wp;
+  for (wp = active_app_frame().active_frame.windows; wp; wp = wp->w_next)
     wp->w_disp_flags &= ~(Window::WDF_WINDOW | Window::WDF_MODELINE);
-  for (Window *wp = app.active_frame.reserved; wp; wp = wp->w_next)
+  for (wp = active_app_frame().active_frame.reserved; wp; wp = wp->w_next)
     wp->w_disp_flags &= ~(Window::WDF_WINDOW | Window::WDF_MODELINE);
 
-  for (int i = 0; i < wc_nwindows; i++)
+  int i = 0;
+  for (i = 0; i < wc_nwindows; i++)
     wc_data[i].wp->w_disp_flags |= Window::WDF_WINDOW | Window::WDF_MODELINE;
 
   Buffer *bp = Buffer::dlist_find ();
 
   Window *reserved = 0, *next;
-  for (Window *wp = app.active_frame.windows; wp; wp = next)
+  for (wp = active_app_frame().active_frame.windows; wp; wp = next)
     {
       next = wp->w_next;
       if (!(wp->w_disp_flags & Window::WDF_WINDOW))
@@ -2421,7 +2438,7 @@ WindowConfiguration::~WindowConfiguration ()
           reserved = wp;
         }
     }
-  for (Window *wp = app.active_frame.reserved; wp; wp = next)
+  for (wp = active_app_frame().active_frame.reserved; wp; wp = next)
     {
       next = wp->w_next;
       if (!(wp->w_disp_flags & Window::WDF_WINDOW))
@@ -2431,11 +2448,11 @@ WindowConfiguration::~WindowConfiguration ()
         }
     }
 
-  app.active_frame.selected = wc_selected;
-  app.active_frame.windows = wc_data[0].wp;
-  for (int i = 0; i < wc_nwindows; i++)
+  active_app_frame().active_frame.selected = wc_selected;
+  active_app_frame().active_frame.windows = wc_data[0].wp;
+  for (i = 0; i < wc_nwindows; i++)
     {
-      Window *wp = wc_data[i].wp;
+      wp = wc_data[i].wp;
       wp->w_prev = i ? wc_data[i - 1].wp : 0;
       wp->w_next = i != wc_nwindows - 1 ? wc_data[i + 1].wp : 0;
 
@@ -2470,10 +2487,10 @@ WindowConfiguration::~WindowConfiguration ()
   assert (xwindow_wp (selected_window ()->lwp));
   assert (xwindow_wp (selected_window ()->lwp) == selected_window ());
 
-  Window::compute_geometry (wc_size);
+  Window::compute_geometry (&active_app_frame(), wc_size);
 
-  app.active_frame.reserved = 0;
-  for (Window *wp = reserved; wp; wp = next)
+  active_app_frame().active_frame.reserved = 0;
+  for (wp = reserved; wp; wp = next)
     {
       next = wp->w_next;
       wp->close ();
@@ -2492,15 +2509,15 @@ Fpos_not_visible_in_window_p (lisp point, lisp window)
   Point cur (wp->w_point);
   bp->goto_char (cur, bp->coerce_to_point (point));
   long top, linenum;
-  if (bp->b_fold_columns == Buffer::FOLD_NONE)
+  if (wp->get_fold_columns() == Buffer::FOLD_NONE)
     {
       linenum = bp->point_linenum (cur);
       top = bp->point_linenum (wp->w_disp);
     }
   else
     {
-      linenum = bp->folded_point_linenum (cur);
-      top = bp->folded_point_linenum (wp->w_disp);
+      linenum = wp->folded_point_linenum (cur);
+      top = wp->folded_point_linenum (wp->w_disp);
     }
   return (linenum < top
           ? make_fixnum (-1)
@@ -2535,30 +2552,36 @@ check_modified_flags (Window *wp, int df)
   return recompute;
 }
 
+extern ApplicationFrame *first_app_frame();
 lisp
 Fset_window_flags (lisp flags)
 {
   int f = fixnum_value (flags);
   int recompute = 0;
   int dflags = Window::w_default_flags;
-  for (Window *w = app.active_frame.windows; w; w = w->w_next)
-    {
-      Window::w_default_flags = dflags;
-      int of = w->flags ();
-      Window::w_default_flags = f;
-      int df = of ^ w->flags ();
-      if (check_modified_flags (w, df))
-        recompute = 1;
-      w->w_disp_flags |= Window::WDF_WINDOW;
-      if (df & (Window::WF_BGCOLOR_MODE | Window::WF_LINE_NUMBER))
-        w->invalidate_glyphs ();
-    }
+  for (ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next) {
+	  for (Window *w = active_app_frame().active_frame.windows; w; w = w->w_next)
+		{
+		  Window::w_default_flags = dflags;
+		  int of = w->flags ();
+		  Window::w_default_flags = f;
+		  int df = of ^ w->flags ();
+		  if (check_modified_flags (w, df))
+			recompute = 1;
+		  w->w_disp_flags |= Window::WDF_WINDOW;
+		  if (df & (Window::WF_BGCOLOR_MODE | Window::WF_LINE_NUMBER))
+			w->invalidate_glyphs ();
+		}
+  }
   Window::w_default_flags = f;
   set_bgmode ();
-  if ((f ^ dflags) & Window::WF_FUNCTION_BAR)
-    recalc_toplevel ();
-  else if (recompute)
-    Window::compute_geometry ();
+  for(ApplicationFrame *app1 = first_app_frame(); app1; app1 = app1->a_next)
+  {
+	  if ((f ^ dflags) & Window::WF_FUNCTION_BAR)
+		recalc_toplevel (app1);
+	  else if (recompute)
+		Window::compute_geometry (app1);
+  }
   return Qt;
 }
 
@@ -2621,7 +2644,8 @@ Fset_local_window_flags (lisp lobj, lisp lflags, lisp lon)
           new_flags &= ~(Window::WF_MODE_LINE | Window::WF_RULER);
           new_flags_mask &= ~(Window::WF_MODE_LINE | Window::WF_RULER);
         }
-      for (Window *wp = app.active_frame.windows; wp; wp = wp->w_next)
+	  all_window_iterator itr;
+      for (Window *wp = itr.begin(); wp; wp = itr.next())
         if (wp->w_bufp == bp)
           {
             bp->b_wflags = old_flags;
@@ -2653,7 +2677,7 @@ Fset_local_window_flags (lisp lobj, lisp lflags, lisp lon)
         recompute = 1;
     }
   if (recompute)
-    Window::compute_geometry ();
+    Window::compute_geometry (&active_app_frame());
   return Qt;
 }
 
@@ -2683,7 +2707,7 @@ next_xyzzy_window (int next)
   int i = xyzzy_instance::instnum ();
   if (i < 0)
     i = -1;
-  xyzzy_hwnd xh (app.toplev);
+  xyzzy_hwnd xh (active_app_frame().toplev);
   HWND hwnd = next ? xh.next (i) : xh.prev (i);
   if (!hwnd)
     return Qnil;
@@ -2706,14 +2730,14 @@ Fprevious_xyzzy_window ()
 lisp
 Fcount_xyzzy_instance ()
 {
-  xyzzy_hwnd xh (app.toplev);
+  xyzzy_hwnd xh (active_app_frame().toplev);
   return make_fixnum (xh.count ());
 }
 
 lisp
 Flist_xyzzy_windows ()
 {
-  xyzzy_hwnd xh (app.toplev);
+  xyzzy_hwnd xh (active_app_frame().toplev);
   int i = -1;
   lisp p = Qnil;
   while (1)
@@ -2734,7 +2758,7 @@ Factivate_xyzzy_window (lisp x)
 {
   int i = fixnum_value (x);
   int o = i--;
-  xyzzy_hwnd xh (app.toplev);
+  xyzzy_hwnd xh (active_app_frame().toplev);
   HWND hwnd = xh.next (i);
   if (!hwnd || i != o)
     return Qnil;
@@ -2764,10 +2788,11 @@ Fwindow_coordinate (lisp lwindow)
 }
 
 lisp
-Fcurrent_window_configuration ()
+Fcurrent_window_configuration (lisp lapp)
 {
+  ApplicationFrame* app = ApplicationFrame::coerce_to_frame(lapp);
   lisp ldefs = Qnil;
-  for (Window *wp = app.active_frame.windows; wp->w_next; wp = wp->w_next)
+  for (Window *wp = app->active_frame.windows; wp->w_next; wp = wp->w_next)
     {
       Buffer *bp = wp->w_bufp;
       ldefs = xcons (make_list (wp->lwp,
@@ -2800,10 +2825,10 @@ Fcurrent_window_configuration ()
     }
 
   return make_list (Qwindow_configuration,
-                    Fselected_window (),
+                    Fselected_window (app->lfp),
                     Fnreverse (ldefs),
-                    make_list (make_fixnum (app.active_frame.size.cx),
-                               make_fixnum (app.active_frame.size.cy),
+                    make_list (make_fixnum (app->active_frame.size.cx),
+                               make_fixnum (app->active_frame.size.cy),
                                0),
                     0);
 }
@@ -2862,7 +2887,8 @@ wc_calc_order (winconf *conf, int nwindows,
             LONG RECT::*edge1, LONG RECT::*edge2, int sz)
 {
   int norders = -1;
-  for (int i = 0; i < nwindows; i++)
+  int i;
+  for (i = 0; i < nwindows; i++)
     {
       if (conf[i].order.*edge1 >= conf[i].order.*edge2
           || conf[i].order.*edge1 < 0
@@ -2910,7 +2936,8 @@ wc_check_order (winconf *conf, int nwindows, const SIZE &sz)
   const int n = nx * ny;
   char *const f = (char *)alloca (n);
   bzero (f, n);
-  for (int i = 0; i < nwindows; i++)
+  int i;
+  for (i = 0; i < nwindows; i++)
     for (int y = conf[i].order.top; y < conf[i].order.bottom; y++)
       for (int x = conf[i].order.left; x < conf[i].order.right; x++)
         if (f[y * nx + x]++)
@@ -2927,19 +2954,20 @@ wc_range (Buffer *bp, point_t point)
 }
 
 static void
-wc_restore (winconf *conf, int nwindows, const SIZE &size,
+wc_restore (ApplicationFrame* owner, winconf *conf, int nwindows, const SIZE &size,
             lisp lselected_window, int curw)
 {
-  Buffer *const bp = selected_buffer ();
+  Buffer *const bp = selected_buffer (owner);
   Window *cur_wp = 0;
-  Window *odeleted = app.active_frame.deleted;
-  for (int i = 0; i < nwindows; i++)
+  Window *odeleted = owner->active_frame.deleted;
+  int i;
+  for (i = 0; i < nwindows; i++)
     {
       if (!conf[i].wp)
         {
-          Window *wp = new Window ();
-          wp->w_next = app.active_frame.deleted;
-          app.active_frame.deleted = wp;
+          Window *wp = new Window (owner);
+          wp->w_next = owner->active_frame.deleted;
+          owner->active_frame.deleted = wp;
           conf[i].wp = wp;
         }
       if (conf[i].lwp == Qnil)
@@ -2953,13 +2981,13 @@ wc_restore (winconf *conf, int nwindows, const SIZE &size,
   if (curw >= 0 && curw < nwindows)
     cur_wp = conf[curw].wp;
 
-  app.active_frame.deleted = odeleted;
+  owner->active_frame.deleted = odeleted;
 
   Window *wp;
-  for (wp = app.active_frame.windows; wp->w_next; wp = wp->w_next)
+  for (wp = owner->active_frame.windows; wp->w_next; wp = wp->w_next)
     wp->w_disp_flags &= ~(Window::WDF_WINDOW | Window::WDF_MODELINE);
   Window *const mini_wp = wp;
-  for (wp = app.active_frame.reserved; wp; wp = wp->w_next)
+  for (wp = owner->active_frame.reserved; wp; wp = wp->w_next)
     wp->w_disp_flags &= ~(Window::WDF_WINDOW | Window::WDF_MODELINE);
 
   for (int i = 0; i < nwindows; i++)
@@ -2971,7 +2999,7 @@ wc_restore (winconf *conf, int nwindows, const SIZE &size,
                             | Window::WDF_GOAL_COLUMN);
 
   Window *reserved = 0, *next;
-  for (wp = app.active_frame.windows; wp->w_next; wp = next)
+  for (wp = owner->active_frame.windows; wp->w_next; wp = next)
     {
       next = wp->w_next;
       if (!(wp->w_disp_flags & Window::WDF_WINDOW))
@@ -2980,7 +3008,7 @@ wc_restore (winconf *conf, int nwindows, const SIZE &size,
           reserved = wp;
         }
     }
-  for (wp = app.active_frame.reserved; wp; wp = next)
+  for (wp = owner->active_frame.reserved; wp; wp = next)
     {
       next = wp->w_next;
       if (!(wp->w_disp_flags & Window::WDF_WINDOW))
@@ -2991,9 +3019,9 @@ wc_restore (winconf *conf, int nwindows, const SIZE &size,
     }
 
   long ymax = -1;
-  app.active_frame.selected = cur_wp ? cur_wp : conf[0].wp;
-  app.active_frame.windows = conf[0].wp;
-  for (int i = 0; i < nwindows; i++)
+  owner->active_frame.selected = cur_wp ? cur_wp : conf[0].wp;
+  owner->active_frame.windows = conf[0].wp;
+  for (i = 0; i < nwindows; i++)
     {
       wp = conf[i].wp;
       wp->w_prev = i ? conf[i - 1].wp : 0;
@@ -3094,9 +3122,9 @@ wc_restore (winconf *conf, int nwindows, const SIZE &size,
   assert (xwindow_wp (selected_window ()->lwp));
   assert (xwindow_wp (selected_window ()->lwp) == selected_window ());
 
-  Window::compute_geometry (size);
+  Window::compute_geometry (owner, size);
 
-  app.active_frame.reserved = 0;
+  owner->active_frame.reserved = 0;
   for (wp = reserved; wp; wp = next)
     {
       next = wp->w_next;
@@ -3105,7 +3133,7 @@ wc_restore (winconf *conf, int nwindows, const SIZE &size,
 }
 
 lisp
-Fset_window_configuration (lisp lconf)
+Fset_window_configuration (lisp lconf, lisp lappframe)
 {
   lisp x = lconf;
   if (xlist_length (x) != 4 || xcar (x) != Qwindow_configuration)
@@ -3121,6 +3149,7 @@ Fset_window_configuration (lisp lconf)
       check_window (lselected_window);
     }
 
+  ApplicationFrame* app_frame = ApplicationFrame::coerce_to_frame(lappframe);
   x = xcdr (x);
   lisp ldefs = xcar (x);
   if (!consp (ldefs))
@@ -3159,7 +3188,7 @@ Fset_window_configuration (lisp lconf)
           conf[i].wp = xwindow_wp (conf[i].lwp);
           if (!conf[i].wp)
             {
-              for (Window *wp = app.active_frame.reserved; wp; wp = wp->w_next)
+			  for (Window *wp = app_frame->active_frame.reserved; wp; wp = wp->w_next)
                 if (wp->lwp == conf[i].lwp)
                   {
                     conf[i].wp = wp;
@@ -3216,7 +3245,7 @@ Fset_window_configuration (lisp lconf)
     FEprogram_error (Einvalid_window_configuration);
 
   wc_check_order (conf, nwindows, size);
-  wc_restore (conf, nwindows, size, lselected_window, curw);
+  wc_restore (app_frame, conf, nwindows, size, lselected_window, curw);
 
   return Qnil;
 }
@@ -3267,14 +3296,14 @@ Fbegin_auto_scroll ()
 {
   POINT p;
   GetCursorPos (&p);
-  Window *wp = Window::find_scr_point_window (p, 0, 0);
+  Window *wp = Window::find_scr_point_window (&active_app_frame(), p, 0, 0);
   if (!wp)
     return Qnil;
   Buffer *bp = wp->w_bufp;
   if (!bp
-      || (bp->b_fold_columns == Buffer::FOLD_NONE
+      || (wp->get_fold_columns() == Buffer::FOLD_NONE
           ? bp->count_lines ()
-          : bp->folded_count_lines ()) <= 1
+          : bp->folded_count_lines (wp->get_fold_columns())) <= 1
       || !begin_auto_scroll (wp->w_hwnd, p, auto_scroll, wp))
     return Qnil;
   return Qt;
@@ -3284,10 +3313,10 @@ void
 Window::calc_ruler_rect (RECT &r) const
 {
   POINT p = {0, 0};
-  MapWindowPoints (w_hwnd, app.active_frame.hwnd, &p, 1);
-  r.left = p.x + app.text_font.cell ().cx / 2;
+  MapWindowPoints (w_hwnd, w_owner->active_frame.hwnd, &p, 1);
+  r.left = p.x + w_owner->text_font.cell ().cx / 2;
   if (flags () & WF_LINE_NUMBER)
-    r.left += (LINENUM_COLUMNS + 1) * app.text_font.cell ().cx;
+    r.left += (LINENUM_COLUMNS + 1) * w_owner->text_font.cell ().cx;
   r.top = p.y - RULER_HEIGHT;
   r.right = p.x + w_clsize.cx + RIGHT_PADDING - 1;
   r.bottom = p.y - 3;
@@ -3296,8 +3325,8 @@ Window::calc_ruler_rect (RECT &r) const
 inline void
 Window::calc_ruler_box (const RECT &r, RECT &br) const
 {
-  br.left = r.left + (w_ruler_column - w_ruler_top_column) * app.text_font.cell ().cx;
-  br.right = br.left + app.text_font.cell ().cx;
+  br.left = r.left + (w_ruler_column - w_ruler_top_column) * w_owner->text_font.cell ().cx;
+  br.right = br.left + w_owner->text_font.cell ().cx;
   br.top = r.top;
   br.bottom = r.bottom;
 }
@@ -3343,6 +3372,7 @@ Window::paint_ruler (HDC hdc, const RECT &r, int x, int y, int column) const
     draw_vline (hdc, y - 1, y + 1, x, sysdep.window_text);
 }
 
+
 void
 Window::paint_ruler (HDC hdc) const
 {
@@ -3352,7 +3382,7 @@ Window::paint_ruler (HDC hdc) const
   RECT r;
 
   GetWindowRect (w_hwnd, &r);
-  MapWindowPoints (HWND_DESKTOP, app.active_frame.hwnd, (POINT *)&r, 2);
+  MapWindowPoints (HWND_DESKTOP, w_owner->active_frame.hwnd, (POINT *)&r, 2);
   r.bottom = r.top;
   r.top -= RULER_HEIGHT;
   draw_hline (hdc, r.left, r.right - 1, r.top, sysdep.btn_highlight);
@@ -3369,7 +3399,7 @@ Window::paint_ruler (HDC hdc) const
   else
     {
       int x = r.left + ((w_ruler_fold_column - w_ruler_top_column)
-                        * app.text_font.cell ().cx);
+                        * w_owner->text_font.cell ().cx);
       if (x < r.right)
         {
           fill_rect (hdc, r.left, r.top, x - r.left, r.bottom - r.top, sysdep.window);
@@ -3384,8 +3414,8 @@ Window::paint_ruler (HDC hdc) const
   int bkmode = SetBkMode (hdc, TRANSPARENT);
 
   int y = (r.top + r.bottom) / 2;
-  for (int x = r.left + app.text_font.cell ().cx / 2, column = w_ruler_top_column + 1;
-       x < r.right; x += app.text_font.cell ().cx, column++)
+  for (int x = r.left + w_owner->text_font.cell ().cx / 2, column = w_ruler_top_column + 1;
+       x < r.right; x += w_owner->text_font.cell ().cx, column++)
     paint_ruler (hdc, r, x, y, column);
 
   SetTextColor (hdc, ofg);
@@ -3413,8 +3443,8 @@ Window::erase_ruler (HDC hdc, const RECT &r) const
   int bkmode = SetBkMode (hdc, TRANSPARENT);
 
   int y = (r.top + r.bottom) / 2;
-  int x = (r.left + app.text_font.cell ().cx / 2
-           + (w_ruler_column - w_ruler_top_column) * app.text_font.cell ().cx);
+  int x = (r.left + w_owner->text_font.cell ().cx / 2
+           + (w_ruler_column - w_ruler_top_column) * w_owner->text_font.cell ().cx);
   int column = w_ruler_column + 1;
   paint_ruler (hdc, br, x, y, column);
 
@@ -3422,11 +3452,11 @@ Window::erase_ruler (HDC hdc, const RECT &r) const
   if (rem)
     {
       column -= rem;
-      x -= rem * app.text_font.cell ().cx;
+      x -= rem * w_owner->text_font.cell ().cx;
       if (column && x >= r.left)
         paint_ruler (hdc, br, x, y, column);
       column += 10;
-      x += 10 * app.text_font.cell ().cx;
+      x += 10 * w_owner->text_font.cell ().cx;
       if (x < r.right)
         paint_ruler (hdc, br, x, y, column);
     }
@@ -3441,25 +3471,25 @@ Window::update_ruler ()
 {
   if (w_disp_flags & WDF_WINDOW
       || w_ruler_top_column != w_top_column
-      || w_ruler_fold_column != w_bufp->b_fold_columns)
+      || w_ruler_fold_column != get_fold_columns())
     {
       w_ruler_top_column = w_top_column;
       w_ruler_column = w_column;
-      w_ruler_fold_column = w_bufp->b_fold_columns;
-      HDC hdc = GetDC (app.active_frame.hwnd);
+      w_ruler_fold_column = get_fold_columns();
+      HDC hdc = GetDC (w_owner->active_frame.hwnd);
       paint_ruler (hdc);
-      ReleaseDC (app.active_frame.hwnd, hdc);
+      ReleaseDC (w_owner->active_frame.hwnd, hdc);
     }
   else if (w_ruler_column != w_column)
     {
-      HDC hdc = GetDC (app.active_frame.hwnd);
+      HDC hdc = GetDC (w_owner->active_frame.hwnd);
       RECT r;
       calc_ruler_rect (r);
       if (w_ruler_column >= 0)
         erase_ruler (hdc, r);
       w_ruler_column = w_column;
       paint_ruler_box (hdc, r);
-      ReleaseDC (app.active_frame.hwnd, hdc);
+      ReleaseDC (w_owner->active_frame.hwnd, hdc);
     }
 }
 
@@ -3470,7 +3500,7 @@ Window::point2window_pos (point_t point, POINT &p) const
 
   point = max (min (point, w_bufp->b_contents.p2),
                w_bufp->b_contents.p1);
-  if (w_bufp->b_fold_columns == Buffer::FOLD_NONE)
+  if (get_fold_columns() == Buffer::FOLD_NONE)
     {
       Point p;
       w_bufp->set_point (p, point);
@@ -3478,16 +3508,16 @@ Window::point2window_pos (point_t point, POINT &p) const
       column = w_bufp->point_column (p);
     }
   else
-    linenum = w_bufp->folded_point_linenum_column (point, &column);
+    linenum = w_bufp->folded_point_linenum_column (point, get_fold_columns(), &column);
 
   p.x = column - w_last_top_column + w_bufp->b_prompt_columns;
   if (w_last_flags & Window::WF_LINE_NUMBER)
     p.x += Window::LINENUM_COLUMNS + 1;
   p.x = min (max (0L, p.x), w_ch_max.cx);
-  p.x *= app.text_font.cell ().cx;
-  p.x += app.text_font.cell ().cx / 2;
+  p.x *= w_owner->text_font.cell ().cx;
+  p.x += w_owner->text_font.cell ().cx / 2;
 
   p.y = linenum - w_last_top_linenum;
   p.y = min (max (0L, p.y), w_ch_max.cy);
-  p.y *= app.text_font.cell ().cy;
+  p.y *= w_owner->text_font.cell ().cy;
 }

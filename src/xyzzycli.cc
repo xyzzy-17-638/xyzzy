@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <malloc.h>
+#include <tlhelp32.h>
 #include "xyzzycli.h"
 #include "listen.h"
 
@@ -11,6 +12,67 @@
 #define SPI_GETFOREGROUNDLOCKTIMEOUT 0x2000
 #define SPI_SETFOREGROUNDLOCKTIMEOUT 0x2001
 #endif
+
+class Wow64
+{
+public:
+  Wow64 ()
+    {
+      fnIsWow64Process = (ISWOW64PROCESS)GetProcAddress (GetModuleHandle ("KERNEL32"), "IsWow64Process");
+    }
+
+  ~Wow64 ()
+    {
+    }
+
+  BOOL IsWow64Process (HANDLE hProcess, PBOOL Wow64Process)
+    {
+      BOOL r = FALSE;
+      if (Wow64Process) {
+        *Wow64Process = FALSE;
+      }
+      if (fnIsWow64Process) {
+        r = fnIsWow64Process (hProcess, Wow64Process);
+      }
+      return r;
+    }
+
+  BOOL IsWow64 ()
+    {
+      BOOL b = FALSE;
+      IsWow64Process (GetCurrentProcess (), &b);
+      return b;
+    }
+
+  BOOL IsParentProcessWow64 ()
+    {
+      BOOL ret = FALSE;
+      if (IsWow64 ())
+        {
+          HANDLE h = CreateToolhelp32Snapshot (TH32CS_SNAPPROCESS, 0);
+          PROCESSENTRY32 pe = { 0 };
+          pe.dwSize = sizeof (PROCESSENTRY32);
+          int pid = GetCurrentProcessId ();
+          if (Process32First (h, &pe))
+            {
+              do
+                {
+                  if (pe.th32ProcessID == pid)
+                    {
+                      HANDLE processHandle = OpenProcess (PROCESS_QUERY_INFORMATION, 0, pe.th32ParentProcessID);
+                      IsWow64Process (processHandle, &ret);
+                      break;
+                    }
+                } while( Process32Next (h, &pe));
+            }
+        }
+      return ret;
+    }
+
+protected:
+  typedef BOOL (WINAPI *ISWOW64PROCESS)(HANDLE, PBOOL);
+  ISWOW64PROCESS fnIsWow64Process;
+};
 
 void
 ForceSetForegroundWindow (HWND hwnd)
@@ -470,6 +532,16 @@ parse_cmdline (const char *p, char *b, int &ac, char **av, const config &cf)
       nchars = notepad_parse_cmdline (p, b, ac, av, nchars);
     }
   nchars = parse_cmdline1 (cf.post_opt, b, ac, av, nchars);
+
+  Wow64 wow;
+  if (wow.IsWow64 () && wow.IsParentProcessWow64 ())
+    {
+      COPYARGV ("-wow64-parent");
+    }
+  else
+    {
+      COPYARGV ("-no-wow64-parent");
+    }
 
   COPYARGV (0);
   return nchars;
